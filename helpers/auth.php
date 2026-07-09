@@ -99,6 +99,8 @@ function require_waybill_access(): void
         exit;
     }
     if (is_region() && session_region_id() === null) {
+        logout_user();
+        session_start();
         set_flash('danger', 'حساب کاربری شما به هیچ منطقه‌ای متصل نیست. لطفاً با مدیر سامانه تماس بگیرید.');
         header('Location: ' . BASE_URL . '/login.php');
         exit;
@@ -115,6 +117,8 @@ function require_assign_operator_access(): void
         exit;
     }
     if (is_region() && session_region_id() === null) {
+        logout_user();
+        session_start();
         set_flash('danger', 'حساب کاربری شما به هیچ منطقه‌ای متصل نیست. لطفاً با مدیر سامانه تماس بگیرید.');
         header('Location: ' . BASE_URL . '/login.php');
         exit;
