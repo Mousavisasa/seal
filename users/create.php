@@ -8,7 +8,14 @@ require_once __DIR__ . '/../helpers/auth.php';
 require_admin();
 
 $errors = [];
-$old = ['national_code' => '', 'first_name' => '', 'last_name' => '', 'user_type' => 'driver'];
+$old = ['national_code' => '', 'first_name' => '', 'last_name' => '', 'user_type' => 'driver', 'region_id' => ''];
+$regions = [];
+
+try {
+    $regions = db()->query('SELECT region_code, region_name FROM regions ORDER BY region_name')->fetchAll();
+} catch (PDOException $e) {
+    error_log('Regions fetch error: ' . $e->getMessage());
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf()) {
@@ -18,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $old['first_name']    = trim((string)($_POST['first_name'] ?? ''));
         $old['last_name']     = trim((string)($_POST['last_name'] ?? ''));
         $old['user_type']     = (string)($_POST['user_type'] ?? '');
+        $old['region_id']     = trim((string)($_POST['region_id'] ?? ''));
         $password             = (string)($_POST['password'] ?? '');
         $password_confirm     = (string)($_POST['password_confirm'] ?? '');
 
@@ -40,6 +48,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'رمز عبور و تکرار آن یکسان نیستند.';
         }
 
+        $regionId = null;
+        if ($old['user_type'] === 'region') {
+            if ($old['region_id'] === '' || (int)$old['region_id'] <= 0) {
+                $errors[] = 'برای کاربر با نقش «منطقه»، انتخاب منطقه الزامی است.';
+            } else {
+                $regionId = (int)$old['region_id'];
+            }
+        }
+
+        if (!$errors && $regionId !== null) {
+            try {
+                $stmt = db()->prepare('SELECT region_code FROM regions WHERE region_code = ? LIMIT 1');
+                $stmt->execute([$regionId]);
+                if (!$stmt->fetch()) {
+                    $errors[] = 'منطقه انتخاب‌شده معتبر نیست.';
+                }
+            } catch (PDOException $e) {
+                error_log('Region validate error: ' . $e->getMessage());
+                $errors[] = 'خطایی در بررسی منطقه رخ داد.';
+            }
+        }
+
         if (!$errors) {
             try {
                 $stmt = db()->prepare('SELECT id FROM users WHERE national_code = ? LIMIT 1');
@@ -48,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $errors[] = 'کاربری با این کد ملی قبلاً ثبت شده است.';
                 } else {
                     $stmt = db()->prepare(
-                        'INSERT INTO users (national_code, first_name, last_name, password, user_type) VALUES (?, ?, ?, ?, ?)'
+                        'INSERT INTO users (national_code, first_name, last_name, password, user_type, region_id) VALUES (?, ?, ?, ?, ?, ?)'
                     );
                     $stmt->execute([
                         $old['national_code'],
@@ -56,6 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $old['last_name'],
                         password_hash($password, PASSWORD_DEFAULT),
                         $old['user_type'],
+                        $regionId,
                     ]);
                     set_flash('success', 'کاربر «' . $old['first_name'] . ' ' . $old['last_name'] . '» با موفقیت ایجاد شد.');
                     header('Location: ' . BASE_URL . '/users/list.php');
@@ -137,6 +168,22 @@ require __DIR__ . '/../includes/header.php';
             <input type="text" class="form-control" id="last_name" name="last_name" required minlength="2"
                    value="<?= e($old['last_name']) ?>" placeholder="مثلاً رضایی">
           </div>
+        </div>
+
+        <div class="col-md-6" id="regionFieldWrapper" style="display:none;">
+          <label class="form-label" for="region_id">منطقه</label>
+          <div class="input-group">
+            <span class="input-group-text"><span class="iconify" data-icon="solar:map-point-bold"></span></span>
+            <select class="form-select" id="region_id" name="region_id">
+              <option value="">— انتخاب کنید —</option>
+              <?php foreach ($regions as $r): ?>
+                <option value="<?= e((string)$r['region_code']) ?>" <?= (string)$r['region_code'] === $old['region_id'] ? 'selected' : '' ?>>
+                  <?= e($r['region_name']) ?> (<?= e((string)$r['region_code']) ?>)
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="form-text">فقط برای کاربر با نقش «منطقه» الزامی است.</div>
         </div>
 
         <div class="col-md-6">

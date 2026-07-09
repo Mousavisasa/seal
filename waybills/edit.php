@@ -1,14 +1,16 @@
 <?php
 /**
  * ویرایش بارنامه سوخت (اطلاعات اصلی بارنامه)
- * تخصیص متصدی/راننده و تغییر وضعیت سفر از این صفحه انجام نمی‌شود؛
- * برای آن صفحات مخصوص (تخصیص متصدی / تخصیص راننده / شروع و پایان سفر) وجود دارد.
+ * کاربر منطقه فقط بارنامه‌ای را می‌تواند ویرایش کند که مبدا یا مقصد آن در منطقه خودش باشد.
+ * تخصیص متصدی/راننده و تغییر وضعیت سفر از این صفحه انجام نمی‌شود.
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../helpers/auth.php';
 require_once __DIR__ . '/../helpers/jalali.php';
 
 require_waybill_access();
+
+$myRegionId = session_region_id();
 
 $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
 $waybill = null;
@@ -31,6 +33,24 @@ try {
 
 if (!$waybill) {
     set_flash('danger', 'بارنامه مورد نظر یافت نشد.');
+    header('Location: ' . BASE_URL . '/waybills/list.php');
+    exit;
+}
+
+/** بررسی اینکه آیا مبدا یا مقصد بارنامه در منطقه کاربر جاری است */
+function waybill_in_region(array $waybill, array $locations, int $regionId): bool
+{
+    $locById = [];
+    foreach ($locations as $l) {
+        $locById[(int)$l['id']] = (int)$l['region_id'];
+    }
+    $originRegion = $locById[(int)$waybill['origin_location_id']] ?? null;
+    $destRegion   = $locById[(int)$waybill['destination_location_id']] ?? null;
+    return $originRegion === $regionId || $destRegion === $regionId;
+}
+
+if ($myRegionId !== null && !waybill_in_region($waybill, $locations, $myRegionId)) {
+    set_flash('danger', 'شما مجاز به مشاهده یا ویرایش این بارنامه نیستید.');
     header('Location: ' . BASE_URL . '/waybills/list.php');
     exit;
 }
@@ -79,23 +99,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'انتخاب مقصد الزامی است.';
         }
 
+        $originLocation = null;
+        $destinationLocation = null;
+
         if (!$errors) {
             try {
                 $pdo = db();
 
-                $stmt = $pdo->prepare('SELECT id FROM locations WHERE id = ? LIMIT 1');
+                $stmt = $pdo->prepare('SELECT id, region_id FROM locations WHERE id = ? LIMIT 1');
                 $stmt->execute([(int)$old['origin_location_id']]);
-                if (!$stmt->fetch()) {
+                $originLocation = $stmt->fetch();
+                if (!$originLocation) {
                     $errors[] = 'مبدا انتخاب‌شده معتبر نیست.';
                 }
 
                 $stmt->execute([(int)$old['destination_location_id']]);
-                if (!$stmt->fetch()) {
+                $destinationLocation = $stmt->fetch();
+                if (!$destinationLocation) {
                     $errors[] = 'مقصد انتخاب‌شده معتبر نیست.';
                 }
             } catch (PDOException $e) {
                 error_log('Waybill relation validate error: ' . $e->getMessage());
                 $errors[] = 'خطایی در بررسی اطلاعات رخ داد.';
+            }
+        }
+
+        if (!$errors && $myRegionId !== null && $originLocation && $destinationLocation) {
+            $inMyRegion = ((int)$originLocation['region_id'] === $myRegionId) || ((int)$destinationLocation['region_id'] === $myRegionId);
+            if (!$inMyRegion) {
+                $errors[] = 'شما فقط می‌توانید بارنامه‌ای را ویرایش کنید که مبدا یا مقصد آن در منطقه شما باشد.';
             }
         }
 
@@ -188,7 +220,9 @@ require __DIR__ . '/../includes/header.php';
             <select class="form-select" id="origin_location_id" name="origin_location_id" required>
               <option value="">— انتخاب کنید —</option>
               <?php foreach ($locations as $l): ?>
-                <option value="<?= e((string)$l['id']) ?>" <?= (string)$l['id'] === $old['origin_location_id'] ? 'selected' : '' ?>>
+                <option value="<?= e((string)$l['id']) ?>"
+                        data-region="<?= e((string)$l['region_id']) ?>"
+                        <?= (string)$l['id'] === $old['origin_location_id'] ? 'selected' : '' ?>>
                   <?= e($l['title']) ?> (<?= e($l['location_code']) ?>) — <?= e($l['region_name']) ?>
                 </option>
               <?php endforeach; ?>
@@ -203,7 +237,9 @@ require __DIR__ . '/../includes/header.php';
             <select class="form-select" id="destination_location_id" name="destination_location_id" required>
               <option value="">— انتخاب کنید —</option>
               <?php foreach ($locations as $l): ?>
-                <option value="<?= e((string)$l['id']) ?>" <?= (string)$l['id'] === $old['destination_location_id'] ? 'selected' : '' ?>>
+                <option value="<?= e((string)$l['id']) ?>"
+                        data-region="<?= e((string)$l['region_id']) ?>"
+                        <?= (string)$l['id'] === $old['destination_location_id'] ? 'selected' : '' ?>>
                   <?= e($l['title']) ?> (<?= e($l['location_code']) ?>) — <?= e($l['region_name']) ?>
                 </option>
               <?php endforeach; ?>
@@ -234,6 +270,10 @@ require __DIR__ . '/../includes/header.php';
         </div>
       </div>
 
+      <?php if ($myRegionId !== null): ?>
+        <input type="hidden" id="my_region_id" value="<?= e((string)$myRegionId) ?>">
+      <?php endif; ?>
+
       <div class="d-flex gap-2 mt-4">
         <button type="submit" class="btn btn-primary d-flex align-items-center gap-2">
           <span class="iconify" data-icon="solar:diskette-bold"></span> ذخیره تغییرات
@@ -245,15 +285,32 @@ require __DIR__ . '/../includes/header.php';
 </div>
 
 <?php if (can_assign_operator()): ?>
-<div class="card panel-card mt-3">
-  <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
-    <div>
-      <div class="fw-bold">تخصیص متصدی ارسال</div>
-      <div class="text-muted small">تعیین کاربر متصدی مسئول این بارنامه</div>
+<div class="row g-3 mt-1">
+  <div class="col-md-6">
+    <div class="card panel-card h-100">
+      <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div>
+          <div class="fw-bold">تخصیص متصدی مبدا</div>
+          <div class="text-muted small">مسئول ارسال از مبدا</div>
+        </div>
+        <a href="<?= BASE_URL ?>/waybills/assign_operator.php?id=<?= e((string)$waybill['id']) ?>&side=origin" class="btn btn-soft-purple d-flex align-items-center gap-2">
+          <span class="iconify" data-icon="solar:user-id-bold"></span> تخصیص
+        </a>
+      </div>
     </div>
-    <a href="<?= BASE_URL ?>/waybills/assign_operator.php?id=<?= e((string)$waybill['id']) ?>" class="btn btn-soft-purple d-flex align-items-center gap-2">
-      <span class="iconify" data-icon="solar:user-id-bold"></span> تخصیص متصدی
-    </a>
+  </div>
+  <div class="col-md-6">
+    <div class="card panel-card h-100">
+      <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div>
+          <div class="fw-bold">تخصیص متصدی مقصد</div>
+          <div class="text-muted small">مسئول تحویل در مقصد</div>
+        </div>
+        <a href="<?= BASE_URL ?>/waybills/assign_operator.php?id=<?= e((string)$waybill['id']) ?>&side=destination" class="btn btn-soft-purple d-flex align-items-center gap-2">
+          <span class="iconify" data-icon="solar:user-id-bold"></span> تخصیص
+        </a>
+      </div>
+    </div>
   </div>
 </div>
 <?php endif; ?>

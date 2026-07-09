@@ -98,6 +98,11 @@ function require_waybill_access(): void
         header('Location: ' . BASE_URL . '/' . redirect_path_for_role($_SESSION['user_type'] ?? '')); 
         exit;
     }
+    if (is_region() && session_region_id() === null) {
+        set_flash('danger', 'حساب کاربری شما به هیچ منطقه‌ای متصل نیست. لطفاً با مدیر سامانه تماس بگیرید.');
+        header('Location: ' . BASE_URL . '/login.php');
+        exit;
+    }
 }
 
 /** محافظ صفحات تخصیص متصدی: فقط ادمین یا منطقه */
@@ -107,6 +112,11 @@ function require_assign_operator_access(): void
     if (!can_assign_operator()) {
         set_flash('danger', 'شما دسترسی لازم برای این بخش را ندارید.');
         header('Location: ' . BASE_URL . '/' . redirect_path_for_role($_SESSION['user_type'] ?? ''));
+        exit;
+    }
+    if (is_region() && session_region_id() === null) {
+        set_flash('danger', 'حساب کاربری شما به هیچ منطقه‌ای متصل نیست. لطفاً با مدیر سامانه تماس بگیرید.');
+        header('Location: ' . BASE_URL . '/login.php');
         exit;
     }
 }
@@ -141,6 +151,13 @@ function login_user(array $user): void
     $_SESSION['user_type']     = $user['user_type'];
     $_SESSION['full_name']     = $user['first_name'] . ' ' . $user['last_name'];
     $_SESSION['national_code'] = $user['national_code'];
+    $_SESSION['region_id']     = $user['region_id'] !== null ? (int)$user['region_id'] : null;
+}
+
+/** کد منطقه کاربر جاری (فقط برای نقش منطقه معنادار است)؛ در غیر این صورت null */
+function session_region_id(): ?int
+{
+    return $_SESSION['region_id'] ?? null;
 }
 
 /** خروج کاربر */

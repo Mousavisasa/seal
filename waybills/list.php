@@ -1,14 +1,15 @@
 <?php
 /**
  * فهرست بارنامه‌های سوخت با جستجو و فیلتر وضعیت/فرآورده
- * منطقه مبدا/مقصد از طریق locations.region_id به‌دست می‌آید (بدون ستون جداگانه در fuel_waybills)
- * تاریخ صدور به شمسی نمایش داده می‌شود
+ * کاربر منطقه فقط بارنامه‌هایی را می‌بیند که مبدا یا مقصد آن در منطقه خودش باشد.
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../helpers/auth.php';
 require_once __DIR__ . '/../helpers/jalali.php';
 
 require_waybill_access();
+
+$myRegionId = session_region_id();
 
 $search = trim((string)($_GET['q'] ?? ''));
 $statusFilter = trim((string)($_GET['status'] ?? ''));
@@ -18,18 +19,27 @@ $waybills = [];
 try {
     $sql = 'SELECT w.*,
                    ol.title AS origin_title, dl.title AS destination_title,
-                   opU.first_name AS operator_first, opU.last_name AS operator_last,
+                   opOrig.first_name AS origin_operator_first, opOrig.last_name AS origin_operator_last,
+                   opDest.first_name AS dest_operator_first, opDest.last_name AS dest_operator_last,
                    drU.first_name AS driver_first, drU.last_name AS driver_last,
-                   orRg.region_name AS origin_region_name, dsRg.region_name AS destination_region_name
+                   orRg.region_name AS origin_region_name, dsRg.region_name AS destination_region_name,
+                   ol.region_id AS origin_region_code, dl.region_id AS destination_region_code
             FROM fuel_waybills w
             INNER JOIN locations ol ON ol.id = w.origin_location_id
             INNER JOIN locations dl ON dl.id = w.destination_location_id
             INNER JOIN regions orRg ON orRg.region_code = ol.region_id
             INNER JOIN regions dsRg ON dsRg.region_code = dl.region_id
-            LEFT JOIN users opU ON opU.id = w.sender_operator_user_id
+            LEFT JOIN users opOrig ON opOrig.id = w.origin_operator_user_id
+            LEFT JOIN users opDest ON opDest.id = w.destination_operator_user_id
             LEFT JOIN users drU ON drU.id = w.driver_user_id
             WHERE 1=1';
     $params = [];
+
+    if ($myRegionId !== null) {
+        $sql .= ' AND (ol.region_id = ? OR dl.region_id = ?)';
+        $params[] = $myRegionId;
+        $params[] = $myRegionId;
+    }
 
     if ($search !== '') {
         $sql .= ' AND w.waybill_number LIKE ?';
@@ -127,7 +137,8 @@ require __DIR__ . '/../includes/header.php';
             <th>فرآورده</th>
             <th>تاریخ صدور</th>
             <th>وضعیت</th>
-            <th>متصدی</th>
+            <th>متصدی مبدا</th>
+            <th>متصدی مقصد</th>
             <th>راننده</th>
             <th class="text-start">عملیات</th>
           </tr>
@@ -142,14 +153,11 @@ require __DIR__ . '/../includes/header.php';
             <td><span class="product-badge"><?= e($w['product_type']) ?></span></td>
             <td class="ltr-text text-muted small"><?= e(to_jalali_display($w['issue_date'])) ?></td>
             <td><span class="status-badge <?= e($statusClassMap[$w['send_status']] ?? '') ?>"><?= e($w['send_status']) ?></span></td>
-            <td><?= $w['operator_first'] ? e($w['operator_first'] . ' ' . $w['operator_last']) : '<span class="text-muted">—</span>' ?></td>
+            <td><?= $w['origin_operator_first'] ? e($w['origin_operator_first'] . ' ' . $w['origin_operator_last']) : '<span class="text-muted">—</span>' ?></td>
+            <td><?= $w['dest_operator_first'] ? e($w['dest_operator_first'] . ' ' . $w['dest_operator_last']) : '<span class="text-muted">—</span>' ?></td>
             <td><?= $w['driver_first'] ? e($w['driver_first'] . ' ' . $w['driver_last']) : '<span class="text-muted">—</span>' ?></td>
             <td class="text-start">
               <div class="d-flex gap-1 justify-content-start flex-wrap">
-                <a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1"
-                   href="<?= BASE_URL ?>/waybills/assign_operator.php?id=<?= e((string)$w['id']) ?>">
-                  <span class="iconify" data-icon="solar:user-id-bold"></span> متصدی
-                </a>
                 <a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
                    href="<?= BASE_URL ?>/waybills/edit.php?id=<?= e((string)$w['id']) ?>">
                   <span class="iconify" data-icon="solar:pen-bold"></span> ویرایش

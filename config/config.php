@@ -20,16 +20,16 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // اطلاعات اتصال به پایگاه داده (پیش‌فرض XAMPP)
 define('DB_HOST', '127.0.0.1');
-define('DB_NAME', 'idtoir_smart_seal');
-define('DB_USER', 'idtoir_smart_seal');
-define('DB_PASS', 'MyPass@1234');
+define('DB_NAME', 'user_panel');
+define('DB_USER', 'root');
+define('DB_PASS', '');
 define('DB_CHARSET', 'utf8mb4');
 
 // مسیر پایه پروژه (نام پوشه در htdocs)
-define('BASE_URL', '/seal');
+define('BASE_URL', '/user-panel');
 
 // عنوان سامانه
-define('APP_NAME', 'سامانه مدیریت پلمپ هوشمند');
+define('APP_NAME', 'سامانه مدیریت کاربران');
 
 // نقش‌های کاربری: کلید انگلیسی برای دیتابیس، مقدار فارسی برای نمایش
 const USER_TYPES = [

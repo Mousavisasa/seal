@@ -1,7 +1,8 @@
 <?php
 /**
- * تخصیص متصدی ارسال به بارنامه
- * دسترسی: ادمین یا کاربر با نقش «منطقه»
+ * تخصیص متصدی مبدا یا مقصد به بارنامه
+ * دسترسی: ادمین یا کاربر با نقش «منطقه» (فقط برای بارنامه‌های مرتبط با منطقه خودش)
+ * پارامتر side: origin یا destination — مشخص می‌کند کدام متصدی تخصیص داده می‌شود
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../helpers/auth.php';
@@ -9,7 +10,16 @@ require_once __DIR__ . '/../helpers/jalali.php';
 
 require_assign_operator_access();
 
+$myRegionId = session_region_id();
+
 $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+$side = (string)($_GET['side'] ?? $_POST['side'] ?? 'origin');
+if (!in_array($side, ['origin', 'destination'], true)) {
+    $side = 'origin';
+}
+$columnName = $side === 'origin' ? 'origin_operator_user_id' : 'destination_operator_user_id';
+$sideLabel = $side === 'origin' ? 'مبدا' : 'مقصد';
+
 $waybill = null;
 $errors = [];
 $operators = [];
@@ -18,7 +28,8 @@ try {
     $operators = db()->query("SELECT id, national_code, first_name, last_name FROM users WHERE user_type = 'operator' ORDER BY first_name")->fetchAll();
 
     $stmt = db()->prepare(
-        'SELECT w.*, ol.title AS origin_title, dl.title AS destination_title
+        'SELECT w.*, ol.title AS origin_title, ol.region_id AS origin_region_id,
+                dl.title AS destination_title, dl.region_id AS destination_region_id
          FROM fuel_waybills w
          INNER JOIN locations ol ON ol.id = w.origin_location_id
          INNER JOIN locations dl ON dl.id = w.destination_location_id
@@ -36,13 +47,23 @@ if (!$waybill) {
     exit;
 }
 
-$selectedOperator = $waybill['sender_operator_user_id'] !== null ? (string)$waybill['sender_operator_user_id'] : '';
+// کاربر منطقه فقط برای بارنامه مرتبط با منطقه خودش مجاز است
+if ($myRegionId !== null) {
+    $inMyRegion = ((int)$waybill['origin_region_id'] === $myRegionId) || ((int)$waybill['destination_region_id'] === $myRegionId);
+    if (!$inMyRegion) {
+        set_flash('danger', 'شما مجاز به مدیریت این بارنامه نیستید.');
+        header('Location: ' . BASE_URL . '/waybills/list.php');
+        exit;
+    }
+}
+
+$selectedOperator = $waybill[$columnName] !== null ? (string)$waybill[$columnName] : '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf()) {
         $errors[] = 'نشست شما منقضی شده است. لطفاً فرم را دوباره ارسال کنید.';
     } else {
-        $selectedOperator = trim((string)($_POST['sender_operator_user_id'] ?? ''));
+        $selectedOperator = trim((string)($_POST['operator_user_id'] ?? ''));
         $operatorId = $selectedOperator !== '' ? (int)$selectedOperator : null;
 
         if ($operatorId !== null) {
@@ -60,9 +81,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!$errors) {
             try {
-                $stmt = db()->prepare('UPDATE fuel_waybills SET sender_operator_user_id = ? WHERE id = ?');
+                $stmt = db()->prepare("UPDATE fuel_waybills SET {$columnName} = ? WHERE id = ?");
                 $stmt->execute([$operatorId, $waybill['id']]);
-                set_flash('success', 'متصدی بارنامه «' . $waybill['waybill_number'] . '» با موفقیت به‌روزرسانی شد.');
+                set_flash('success', 'متصدی ' . $sideLabel . ' بارنامه «' . $waybill['waybill_number'] . '» با موفقیت به‌روزرسانی شد.');
                 header('Location: ' . BASE_URL . '/waybills/list.php');
                 exit;
             } catch (PDOException $e) {
@@ -73,14 +94,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$page_title = 'تخصیص متصدی';
+$page_title = 'تخصیص متصدی ' . $sideLabel;
 $active = 'waybills';
 require __DIR__ . '/../includes/header.php';
 ?>
 
 <div class="mb-4">
-  <h1 class="h4 fw-bold mb-1">تخصیص متصدی ارسال</h1>
-  <p class="text-muted small mb-0">متصدی مسئول این بارنامه را انتخاب کنید.</p>
+  <h1 class="h4 fw-bold mb-1">تخصیص متصدی <?= e($sideLabel) ?></h1>
+  <p class="text-muted small mb-0">متصدی مسئول <?= e($sideLabel) ?> این بارنامه را انتخاب کنید.</p>
 </div>
 
 <?php if ($errors): ?>
@@ -111,11 +132,12 @@ require __DIR__ . '/../includes/header.php';
         <form method="post" action="<?= BASE_URL ?>/waybills/assign_operator.php" novalidate>
           <?= csrf_field() ?>
           <input type="hidden" name="id" value="<?= e((string)$waybill['id']) ?>">
+          <input type="hidden" name="side" value="<?= e($side) ?>">
 
-          <label class="form-label" for="sender_operator_user_id">کد کاربر متصدی ارسال</label>
+          <label class="form-label" for="operator_user_id">کد کاربر متصدی <?= e($sideLabel) ?></label>
           <div class="input-group mb-3">
             <span class="input-group-text"><span class="iconify" data-icon="solar:user-id-bold"></span></span>
-            <select class="form-select" id="sender_operator_user_id" name="sender_operator_user_id">
+            <select class="form-select" id="operator_user_id" name="operator_user_id">
               <option value="">— بدون متصدی —</option>
               <?php foreach ($operators as $u): ?>
                 <option value="<?= e((string)$u['id']) ?>" <?= (string)$u['id'] === $selectedOperator ? 'selected' : '' ?>>
@@ -132,7 +154,7 @@ require __DIR__ . '/../includes/header.php';
             <button type="submit" class="btn btn-primary d-flex align-items-center gap-2">
               <span class="iconify" data-icon="solar:diskette-bold"></span> ذخیره
             </button>
-            <a href="<?= BASE_URL ?>/waybills/list.php" class="btn btn-outline-secondary">بازگشت</a>
+            <a href="<?= BASE_URL ?>/waybills/edit.php?id=<?= e((string)$waybill['id']) ?>" class="btn btn-outline-secondary">بازگشت</a>
           </div>
         </form>
       </div>

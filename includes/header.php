@@ -18,6 +18,7 @@ $active = $active ?? '';
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css">
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
 <script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 </head>
 <body class="panel-body">
 

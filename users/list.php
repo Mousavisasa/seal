@@ -10,7 +10,11 @@ require_admin();
 
 $users = [];
 try {
-    $users = db()->query('SELECT id, national_code, first_name, last_name, user_type, created_at FROM users ORDER BY id DESC')->fetchAll();
+    $users = db()->query(
+        'SELECT u.id, u.national_code, u.first_name, u.last_name, u.user_type, u.region_id, u.created_at, r.region_name
+         FROM users u LEFT JOIN regions r ON r.region_code = u.region_id
+         ORDER BY u.id DESC'
+    )->fetchAll();
 } catch (PDOException $e) {
     error_log('List users error: ' . $e->getMessage());
     set_flash('danger', 'خطایی در دریافت فهرست کاربران رخ داد.');
@@ -44,6 +48,7 @@ require __DIR__ . '/../includes/header.php';
             <th>نام و نام خانوادگی</th>
             <th>کد ملی</th>
             <th>نقش</th>
+            <th>منطقه</th>
             <th>تاریخ ثبت</th>
             <th class="text-start">عملیات</th>
           </tr>
@@ -55,6 +60,7 @@ require __DIR__ . '/../includes/header.php';
             <td class="fw-bold"><?= e($u['first_name'] . ' ' . $u['last_name']) ?></td>
             <td class="ltr-text"><?= e($u['national_code']) ?></td>
             <td><span class="badge role-badge role-<?= e($u['user_type']) ?>"><?= e(user_type_label($u['user_type'])) ?></span></td>
+            <td><?= $u['region_name'] ? e($u['region_name']) : '<span class="text-muted">—</span>' ?></td>
             <td class="ltr-text text-muted small"><?= e(to_jalali_datetime_display($u['created_at'])) ?></td>
             <td class="text-start">
               <a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1"

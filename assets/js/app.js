@@ -296,3 +296,57 @@
     });
   });
 })();
+
+/* ---------- راهنمای انتخاب مبدا/مقصد برای کاربر منطقه (فقط هشدار بصری، نه اعتبارسنجی نهایی) ---------- */
+(function () {
+  'use strict';
+  var myRegionInput = document.getElementById('my_region_id');
+  var originSel = document.getElementById('origin_location_id');
+  var destSel = document.getElementById('destination_location_id');
+  if (!myRegionInput || !originSel || !destSel) return;
+
+  var myRegion = myRegionInput.value;
+
+  function checkRegionMatch() {
+    var originRegion = originSel.selectedOptions[0] ? originSel.selectedOptions[0].getAttribute('data-region') : '';
+    var destRegion = destSel.selectedOptions[0] ? destSel.selectedOptions[0].getAttribute('data-region') : '';
+    var ok = !originRegion && !destRegion ? true : (originRegion === myRegion || destRegion === myRegion);
+
+    var existingWarning = document.getElementById('regionMismatchWarning');
+    if (!ok) {
+      if (!existingWarning) {
+        var div = document.createElement('div');
+        div.id = 'regionMismatchWarning';
+        div.className = 'alert alert-warning d-flex align-items-center gap-2 mt-3';
+        div.innerHTML = '<span class="iconify" data-icon="solar:danger-triangle-bold"></span> مبدا یا مقصد انتخاب‌شده باید در منطقه شما باشد.';
+        destSel.closest('form').insertBefore(div, destSel.closest('form').querySelector('.d-flex.gap-2.mt-4'));
+      }
+    } else if (existingWarning) {
+      existingWarning.remove();
+    }
+  }
+
+  originSel.addEventListener('change', checkRegionMatch);
+  destSel.addEventListener('change', checkRegionMatch);
+})();
+
+/* ---------- نمایش/مخفی‌کردن فیلد منطقه بر اساس نقش کاربر در فرم ایجاد/ویرایش کاربر ---------- */
+(function () {
+  'use strict';
+  var userTypeSel = document.getElementById('user_type');
+  var regionWrapper = document.getElementById('regionFieldWrapper');
+  if (!userTypeSel || !regionWrapper) return;
+
+  function toggleRegionField() {
+    var show = userTypeSel.value === 'region';
+    regionWrapper.style.display = show ? '' : 'none';
+    var regionSelect = document.getElementById('region_id');
+    if (regionSelect) {
+      regionSelect.required = show;
+      if (!show) regionSelect.value = '';
+    }
+  }
+
+  userTypeSel.addEventListener('change', toggleRegionField);
+  toggleRegionField();
+})();

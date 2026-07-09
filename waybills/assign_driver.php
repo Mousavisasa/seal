@@ -1,7 +1,8 @@
 <?php
 /**
  * تخصیص راننده حمل‌کننده به بارنامه
- * دسترسی: ادمین (همه بارنامه‌ها) یا کاربر متصدی (فقط بارنامه‌های تخصیص‌یافته به خودش)
+ * دسترسی: ادمین (همه بارنامه‌ها) یا کاربر متصدی که به‌عنوان متصدی مبدا یا مقصد
+ * همین بارنامه تخصیص یافته است.
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../helpers/auth.php';
@@ -36,11 +37,15 @@ if (!$waybill) {
     exit;
 }
 
-// کاربر متصدی فقط مجاز به تخصیص راننده برای بارنامه‌های تخصیص‌یافته به خودش است
-if (is_operator() && (int)$waybill['sender_operator_user_id'] !== (int)$_SESSION['user_id']) {
-    set_flash('danger', 'این بارنامه به شما تخصیص داده نشده است.');
-    header('Location: ' . BASE_URL . '/waybills/my_waybills.php');
-    exit;
+// کاربر متصدی فقط مجاز به تخصیص راننده برای بارنامه‌هایی است که متصدی مبدا یا مقصد آن باشد
+if (is_operator()) {
+    $isOriginOperator = (int)$waybill['origin_operator_user_id'] === (int)$_SESSION['user_id'];
+    $isDestOperator   = (int)$waybill['destination_operator_user_id'] === (int)$_SESSION['user_id'];
+    if (!$isOriginOperator && !$isDestOperator) {
+        set_flash('danger', 'این بارنامه به شما تخصیص داده نشده است.');
+        header('Location: ' . BASE_URL . '/waybills/my_waybills.php');
+        exit;
+    }
 }
 
 $selectedDriver = $waybill['driver_user_id'] !== null ? (string)$waybill['driver_user_id'] : '';

@@ -141,3 +141,25 @@ function today_jalali(): string
     [$jy, $jm, $jd] = gregorian_to_jalali((int)$gy, (int)$gm, (int)$gd);
     return sprintf('%04d/%02d/%02d', $jy, $jm, $jd);
 }
+
+/** نام ماه شمسی از عدد ماه (۱ تا ۱۲) */
+function jalali_month_name(int $month): string
+{
+    $names = [
+        1 => 'فروردین', 2 => 'اردیبهشت', 3 => 'خرداد', 4 => 'تیر',
+        5 => 'مرداد', 6 => 'شهریور', 7 => 'مهر', 8 => 'آبان',
+        9 => 'آذر', 10 => 'دی', 11 => 'بهمن', 12 => 'اسفند',
+    ];
+    return $names[$month] ?? (string)$month;
+}
+
+/** تبدیل ماه میلادی به فرمت Y-m به برچسب شمسی «نام‌ماه سال» برای محور نمودار */
+function ym_to_jalali_label(string $ymGregorian): string
+{
+    if (!preg_match('/^(\d{4})-(\d{2})$/', $ymGregorian, $m)) {
+        return $ymGregorian;
+    }
+    // روز ۱۵ به‌عنوان روز میانی ماه برای تبدیل امن استفاده می‌شود
+    [$jy, $jm] = gregorian_to_jalali((int)$m[1], (int)$m[2], 15);
+    return jalali_month_name($jm) . ' ' . $jy;
+}

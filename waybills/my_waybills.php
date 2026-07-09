@@ -1,6 +1,7 @@
 <?php
 /**
  * فهرست بارنامه‌های تخصیص‌یافته به کاربر متصدی جاری
+ * متصدی بارنامه‌هایی را می‌بیند که به‌عنوان متصدی مبدا یا متصدی مقصد آن تخصیص یافته است.
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../helpers/auth.php';
@@ -30,10 +31,10 @@ try {
          INNER JOIN locations ol ON ol.id = w.origin_location_id
          INNER JOIN locations dl ON dl.id = w.destination_location_id
          LEFT JOIN users drU ON drU.id = w.driver_user_id
-         WHERE w.sender_operator_user_id = ?
+         WHERE w.origin_operator_user_id = ? OR w.destination_operator_user_id = ?
          ORDER BY w.id DESC'
     );
-    $stmt->execute([(int)$_SESSION['user_id']]);
+    $stmt->execute([(int)$_SESSION['user_id'], (int)$_SESSION['user_id']]);
     $waybills = $stmt->fetchAll();
 } catch (PDOException $e) {
     error_log('My waybills error: ' . $e->getMessage());
@@ -47,7 +48,7 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="mb-4">
   <h1 class="h4 fw-bold mb-1">بارنامه‌های تخصیص‌یافته به من</h1>
-  <p class="text-muted small mb-0">تعداد کل: <?= e((string)count($waybills)) ?> بارنامه</p>
+  <p class="text-muted small mb-0">تعداد کل: <?= e((string)count($waybills)) ?> بارنامه (به‌عنوان متصدی مبدا یا مقصد)</p>
 </div>
 
 <?= render_flash() ?>
@@ -62,6 +63,7 @@ require __DIR__ . '/../includes/header.php';
             <th>شماره بارنامه</th>
             <th>مبدا</th>
             <th>مقصد</th>
+            <th>نقش من</th>
             <th>فرآورده</th>
             <th>تاریخ صدور</th>
             <th>وضعیت</th>
@@ -71,10 +73,24 @@ require __DIR__ . '/../includes/header.php';
         </thead>
         <tbody>
           <?php foreach ($waybills as $w): ?>
+          <?php
+            $myRoles = [];
+            if ((int)$w['origin_operator_user_id'] === (int)$_SESSION['user_id']) {
+                $myRoles[] = 'متصدی مبدا';
+            }
+            if ((int)$w['destination_operator_user_id'] === (int)$_SESSION['user_id']) {
+                $myRoles[] = 'متصدی مقصد';
+            }
+          ?>
           <tr>
             <td class="ltr-text fw-bold"><?= e($w['waybill_number']) ?></td>
             <td><?= e($w['origin_title']) ?></td>
             <td><?= e($w['destination_title']) ?></td>
+            <td>
+              <?php foreach ($myRoles as $role): ?>
+                <span class="badge role-badge role-region"><?= e($role) ?></span>
+              <?php endforeach; ?>
+            </td>
             <td><span class="product-badge"><?= e($w['product_type']) ?></span></td>
             <td class="ltr-text text-muted small"><?= e(to_jalali_display($w['issue_date'])) ?></td>
             <td><span class="status-badge <?= e($statusClassMap[$w['send_status']] ?? '') ?>"><?= e($w['send_status']) ?></span></td>

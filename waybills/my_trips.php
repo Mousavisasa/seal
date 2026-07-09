@@ -68,11 +68,13 @@ $statusClassMap = [
 try {
     $driverFilter = is_admin() ? null : (int)$_SESSION['user_id'];
     $sql = 'SELECT w.*, ol.title AS origin_title, dl.title AS destination_title,
-                   opU.first_name AS operator_first, opU.last_name AS operator_last
+                   opOrig.first_name AS origin_operator_first, opOrig.last_name AS origin_operator_last,
+                   opDest.first_name AS dest_operator_first, opDest.last_name AS dest_operator_last
             FROM fuel_waybills w
             INNER JOIN locations ol ON ol.id = w.origin_location_id
             INNER JOIN locations dl ON dl.id = w.destination_location_id
-            LEFT JOIN users opU ON opU.id = w.sender_operator_user_id';
+            LEFT JOIN users opOrig ON opOrig.id = w.origin_operator_user_id
+            LEFT JOIN users opDest ON opDest.id = w.destination_operator_user_id';
     $params = [];
     if ($driverFilter !== null) {
         $sql .= ' WHERE w.driver_user_id = ?';
@@ -126,9 +128,15 @@ require __DIR__ . '/../includes/header.php';
           <span class="iconify" data-icon="solar:calendar-bold"></span> تاریخ صدور: <?= e(to_jalali_display($w['issue_date'])) ?>
         </div>
 
-        <?php if ($w['operator_first']): ?>
+        <?php if ($w['origin_operator_first']): ?>
         <div class="small text-muted d-flex align-items-center gap-1">
-          <span class="iconify" data-icon="solar:user-id-bold"></span> متصدی: <?= e($w['operator_first'] . ' ' . $w['operator_last']) ?>
+          <span class="iconify" data-icon="solar:user-id-bold"></span> متصدی مبدا: <?= e($w['origin_operator_first'] . ' ' . $w['origin_operator_last']) ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($w['dest_operator_first']): ?>
+        <div class="small text-muted d-flex align-items-center gap-1">
+          <span class="iconify" data-icon="solar:user-id-bold"></span> متصدی مقصد: <?= e($w['dest_operator_first'] . ' ' . $w['dest_operator_last']) ?>
         </div>
         <?php endif; ?>
 

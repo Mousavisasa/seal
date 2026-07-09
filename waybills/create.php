@@ -2,9 +2,9 @@
 /**
  * ایجاد بارنامه سوخت جدید
  * نکات این نسخه:
- * - متصدی ارسال و راننده در این فرم دریافت نمی‌شوند؛ بعداً تخصیص داده می‌شوند
- *   (متصدی توسط کاربر منطقه/ادمین، راننده توسط کاربر متصدی/ادمین)
+ * - متصدی مبدا/مقصد و راننده در این فرم دریافت نمی‌شوند؛ بعداً تخصیص داده می‌شوند
  * - کد منطقه مبدا/مقصد دریافت نمی‌شود؛ از طریق مکان انتخاب‌شده (locations.region_id) مشخص می‌شود
+ * - کاربر با نقش «منطقه» فقط می‌تواند بارنامه‌ای ثبت کند که مبدا یا مقصد آن در منطقه خودش باشد
  * - تاریخ صدور به‌صورت شمسی از کاربر گرفته و به میلادی تبدیل می‌شود
  */
 require_once __DIR__ . '/../config/db.php';
@@ -12,6 +12,8 @@ require_once __DIR__ . '/../helpers/auth.php';
 require_once __DIR__ . '/../helpers/jalali.php';
 
 require_waybill_access();
+
+$myRegionId = session_region_id(); // null برای ادمین (بدون محدودیت)
 
 $errors = [];
 $old = [
@@ -71,23 +73,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'انتخاب مقصد الزامی است.';
         }
 
+        $originLocation = null;
+        $destinationLocation = null;
+
         if (!$errors) {
             try {
                 $pdo = db();
 
-                $stmt = $pdo->prepare('SELECT id FROM locations WHERE id = ? LIMIT 1');
+                $stmt = $pdo->prepare('SELECT id, region_id FROM locations WHERE id = ? LIMIT 1');
                 $stmt->execute([(int)$old['origin_location_id']]);
-                if (!$stmt->fetch()) {
+                $originLocation = $stmt->fetch();
+                if (!$originLocation) {
                     $errors[] = 'مبدا انتخاب‌شده معتبر نیست.';
                 }
 
                 $stmt->execute([(int)$old['destination_location_id']]);
-                if (!$stmt->fetch()) {
+                $destinationLocation = $stmt->fetch();
+                if (!$destinationLocation) {
                     $errors[] = 'مقصد انتخاب‌شده معتبر نیست.';
                 }
             } catch (PDOException $e) {
                 error_log('Waybill relation validate error: ' . $e->getMessage());
                 $errors[] = 'خطایی در بررسی اطلاعات رخ داد.';
+            }
+        }
+
+        // کاربر منطقه فقط مجاز به ثبت بارنامه‌ای است که مبدا یا مقصد آن در منطقه خودش باشد
+        if (!$errors && $myRegionId !== null && $originLocation && $destinationLocation) {
+            $inMyRegion = ((int)$originLocation['region_id'] === $myRegionId) || ((int)$destinationLocation['region_id'] === $myRegionId);
+            if (!$inMyRegion) {
+                $errors[] = 'شما فقط می‌توانید بارنامه‌ای ثبت کنید که مبدا یا مقصد آن در منطقه شما باشد.';
             }
         }
 
@@ -134,7 +149,12 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="mb-4">
   <h1 class="h4 fw-bold mb-1">ایجاد بارنامه سوخت جدید</h1>
-  <p class="text-muted small mb-0">اطلاعات بارنامه را وارد کنید. تخصیص متصدی و راننده پس از ثبت انجام می‌شود.</p>
+  <p class="text-muted small mb-0">
+    اطلاعات بارنامه را وارد کنید. تخصیص متصدی و راننده پس از ثبت انجام می‌شود.
+    <?php if ($myRegionId !== null): ?>
+      <span class="d-block mt-1">شما فقط می‌توانید بارنامه‌ای ثبت کنید که مبدا یا مقصد آن در منطقه شما باشد.</span>
+    <?php endif; ?>
+  </p>
 </div>
 
 <?php if ($errors): ?>
@@ -181,7 +201,9 @@ require __DIR__ . '/../includes/header.php';
             <select class="form-select" id="origin_location_id" name="origin_location_id" required>
               <option value="">— انتخاب کنید —</option>
               <?php foreach ($locations as $l): ?>
-                <option value="<?= e((string)$l['id']) ?>" <?= (string)$l['id'] === $old['origin_location_id'] ? 'selected' : '' ?>>
+                <option value="<?= e((string)$l['id']) ?>"
+                        data-region="<?= e((string)$l['region_id']) ?>"
+                        <?= (string)$l['id'] === $old['origin_location_id'] ? 'selected' : '' ?>>
                   <?= e($l['title']) ?> (<?= e($l['location_code']) ?>) — <?= e($l['region_name']) ?>
                 </option>
               <?php endforeach; ?>
@@ -196,7 +218,9 @@ require __DIR__ . '/../includes/header.php';
             <select class="form-select" id="destination_location_id" name="destination_location_id" required>
               <option value="">— انتخاب کنید —</option>
               <?php foreach ($locations as $l): ?>
-                <option value="<?= e((string)$l['id']) ?>" <?= (string)$l['id'] === $old['destination_location_id'] ? 'selected' : '' ?>>
+                <option value="<?= e((string)$l['id']) ?>"
+                        data-region="<?= e((string)$l['region_id']) ?>"
+                        <?= (string)$l['id'] === $old['destination_location_id'] ? 'selected' : '' ?>>
                   <?= e($l['title']) ?> (<?= e($l['location_code']) ?>) — <?= e($l['region_name']) ?>
                 </option>
               <?php endforeach; ?>
@@ -226,6 +250,10 @@ require __DIR__ . '/../includes/header.php';
           </div>
         </div>
       </div>
+
+      <?php if ($myRegionId !== null): ?>
+        <input type="hidden" id="my_region_id" value="<?= e((string)$myRegionId) ?>">
+      <?php endif; ?>
 
       <div class="d-flex gap-2 mt-4">
         <button type="submit" class="btn btn-primary d-flex align-items-center gap-2">
