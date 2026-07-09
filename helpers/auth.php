@@ -18,12 +18,39 @@ function is_admin(): bool
     return is_logged_in() && ($_SESSION['user_type'] ?? '') === 'admin';
 }
 
+/** آیا کاربر جاری نقش «منطقه» دارد؟ */
+function is_region(): bool
+{
+    return is_logged_in() && ($_SESSION['user_type'] ?? '') === 'region';
+}
+
+/** آیا کاربر جاری به ماژول بارنامه سوخت دسترسی دارد؟ (ادمین یا منطقه) */
+function can_access_waybill_module(): bool
+{
+    return is_admin() || is_region();
+}
+
 /** محافظ صفحات ادمین: در صورت نبود دسترسی، هدایت به صفحه ورود */
 function require_admin(): void
 {
     if (!is_admin()) {
         set_flash('warning', 'برای دسترسی به این بخش ابتدا وارد شوید.');
         header('Location: ' . BASE_URL . '/login.php');
+        exit;
+    }
+}
+
+/** محافظ صفحات ماژول بارنامه سوخت: فقط ادمین یا منطقه */
+function require_waybill_access(): void
+{
+    if (!is_logged_in()) {
+        set_flash('warning', 'برای دسترسی به این بخش ابتدا وارد شوید.');
+        header('Location: ' . BASE_URL . '/login.php');
+        exit;
+    }
+    if (!can_access_waybill_module()) {
+        set_flash('danger', 'شما دسترسی لازم برای این بخش را ندارید.');
+        header('Location: ' . BASE_URL . '/dashboard.php');
         exit;
     }
 }

@@ -16,7 +16,7 @@ try {
 }
 
 $page_title = 'فهرست کاربران';
-$active = 'list';
+$active = 'users-list';
 require __DIR__ . '/../includes/header.php';
 ?>
 

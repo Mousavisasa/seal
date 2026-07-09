@@ -274,3 +274,14 @@ body { background: var(--surface); color: var(--ink); }
 .badge-status-ok   { background: var(--jade-soft); color: var(--jade-dark); }
 .badge-status-err  { background: #fdecec; color: #b02a37; }
 .badge-status-warn { background: #fff7e0; color: #997404; }
+
+/* ---------- ماژول بارنامه سوخت ---------- */
+.status-badge { font-weight: 600; font-size: .78rem; padding: .4em .8em; border-radius: 2rem; }
+.status-registered { background: var(--purple-soft); color: var(--purple-dark); }
+.status-sent        { background: #fff3e0; color: #b26a00; }
+.status-delivered   { background: var(--jade-soft); color: var(--jade-dark); }
+.status-cancelled   { background: #fdecec; color: #b02a37; }
+
+.product-badge { font-weight: 600; font-size: .78rem; padding: .35em .75em; border-radius: .5rem; background: #eef1f6; color: #3d4b5c; }
+
+.filter-bar { background: #fff; border-radius: var(--card-radius); box-shadow: var(--soft-shadow); padding: 1rem 1.25rem; }

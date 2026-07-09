@@ -114,3 +114,16 @@ function user_type_label(string $type): string
 {
     return USER_TYPES[$type] ?? $type;
 }
+
+/** بررسی معتبربودن تاریخ به فرمت Y-m-d */
+function is_valid_date(string $date): bool
+{
+    $d = DateTime::createFromFormat('Y-m-d', $date);
+    return $d && $d->format('Y-m-d') === $date;
+}
+
+/** بررسی عدد مثبت (برای مسافت و مقادیر مشابه) */
+function is_positive_number($value): bool
+{
+    return is_numeric($value) && (float)$value > 0;
+}

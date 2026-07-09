@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $page_title = 'بازنشانی رمز عبور';
-$active = 'list';
+$active = 'users-list';
 require __DIR__ . '/../includes/header.php';
 ?>
 

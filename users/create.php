@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $page_title = 'ایجاد کاربر';
-$active = 'create';
+$active = 'users-create';
 require __DIR__ . '/../includes/header.php';
 ?>
 

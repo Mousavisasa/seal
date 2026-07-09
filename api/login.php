@@ -1,8 +1,8 @@
 <?php
 /**
- * وب‌سرویس ورود (REST API)
+ * وب‌سرویس ورود (REST API) - بدون نیاز به هدر خاص یا احراز هویت
  * POST /api/login.php
- * ورودی: JSON یا form-data شامل username و password
+ * ورودی: username و password (form-data یا JSON، هدر اختیاری است)
  * خروجی: همیشه JSON با ساختار ثابت { success, message, user? }
  */
 require_once __DIR__ . '/../config/db.php';
@@ -27,16 +27,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(405, false, 'متد درخواست مجاز نیست. فقط POST پذیرفته می‌شود.');
 }
 
-// خواندن ورودی: JSON یا form-data
+// خواندن ورودی: بدون وابستگی به هدر Content-Type
+// اول از form-data ($_POST) می‌خوانیم؛ اگر خالی بود، بدنه خام را به‌عنوان JSON امتحان می‌کنیم
 $input = $_POST;
-$contentType = $_SERVER['CONTENT_TYPE'] ?? '';
-if (stripos($contentType, 'application/json') !== false) {
+if (empty($input)) {
     $raw = file_get_contents('php://input');
-    $decoded = json_decode($raw, true);
-    if (!is_array($decoded)) {
-        json_response(400, false, 'ساختار JSON ارسالی معتبر نیست.');
+    $decoded = json_decode((string)$raw, true);
+    if (is_array($decoded)) {
+        $input = $decoded;
     }
-    $input = $decoded;
 }
 
 $username = normalize_digits((string)($input['username'] ?? ''));

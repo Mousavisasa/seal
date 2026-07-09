@@ -54,15 +54,32 @@ $active = $active ?? '';
         </a>
       </li>
       <li>
-        <a href="<?= BASE_URL ?>/users/list.php" class="<?= $active === 'list' ? 'active' : '' ?>">
+        <a href="<?= BASE_URL ?>/users/list.php" class="<?= $active === 'users-list' ? 'active' : '' ?>">
           <span class="iconify" data-icon="solar:users-group-rounded-bold"></span> فهرست کاربران
         </a>
       </li>
       <li>
-        <a href="<?= BASE_URL ?>/users/create.php" class="<?= $active === 'create' ? 'active' : '' ?>">
+        <a href="<?= BASE_URL ?>/users/create.php" class="<?= $active === 'users-create' ? 'active' : '' ?>">
           <span class="iconify" data-icon="solar:user-plus-rounded-bold"></span> ایجاد کاربر
         </a>
       </li>
+      <?php if (can_access_waybill_module()): ?>
+      <li>
+        <a href="<?= BASE_URL ?>/regions/list.php" class="<?= $active === 'regions' ? 'active' : '' ?>">
+          <span class="iconify" data-icon="solar:map-point-bold"></span> مدیریت مناطق
+        </a>
+      </li>
+      <li>
+        <a href="<?= BASE_URL ?>/locations/list.php" class="<?= $active === 'locations' ? 'active' : '' ?>">
+          <span class="iconify" data-icon="solar:signpost-bold"></span> مدیریت مبادی و مقاصد
+        </a>
+      </li>
+      <li>
+        <a href="<?= BASE_URL ?>/waybills/list.php" class="<?= $active === 'waybills' ? 'active' : '' ?>">
+          <span class="iconify" data-icon="solar:fuel-bold"></span> مدیریت بارنامه سوخت
+        </a>
+      </li>
+      <?php endif; ?>
       <li>
         <a href="<?= BASE_URL ?>/api_test.php" class="<?= $active === 'api' ? 'active' : '' ?>">
           <span class="iconify" data-icon="solar:code-square-bold"></span> تست وب‌سرویس
