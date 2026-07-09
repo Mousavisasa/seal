@@ -3,7 +3,7 @@
  * توابع احراز هویت و کنترل دسترسی (نقش میان‌افزار ساده)
  */
 
-require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/functions.php';
 
 /** آیا کاربری وارد شده است؟ */
@@ -69,13 +69,37 @@ function redirect_path_for_role(string $userType): string
     }
 }
 
-/** محافظ عمومی: فقط کاربر واردشده */
+/** محافظ عمومی: فقط کاربر واردشده و فعال */
 function require_login(): void
 {
     if (!is_logged_in()) {
         set_flash('warning', 'برای دسترسی به این بخش ابتدا وارد شوید.');
         header('Location: ' . BASE_URL . '/login.php');
         exit;
+    }
+    if (!current_user_is_active()) {
+        logout_user();
+        session_start();
+        set_flash('danger', 'حساب کاربری شما غیرفعال شده است. برای اطلاعات بیشتر با مدیر سامانه تماس بگیرید.');
+        header('Location: ' . BASE_URL . '/login.php');
+        exit;
+    }
+}
+
+/** بررسی فعال‌بودن کاربر جاری از دیتابیس (برای تشخیص غیرفعال‌شدن حین نشست فعال) */
+function current_user_is_active(): bool
+{
+    if (!is_logged_in()) {
+        return false;
+    }
+    try {
+        $stmt = db()->prepare('SELECT is_active FROM users WHERE id = ? LIMIT 1');
+        $stmt->execute([(int)$_SESSION['user_id']]);
+        $row = $stmt->fetch();
+        return $row !== false && (int)$row['is_active'] === 1;
+    } catch (PDOException $e) {
+        error_log('Active check error: ' . $e->getMessage());
+        return true; // در صورت خطای دیتابیس، کاربر را بی‌جهت خارج نمی‌کنیم
     }
 }
 

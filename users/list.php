@@ -11,7 +11,7 @@ require_admin();
 $users = [];
 try {
     $users = db()->query(
-        'SELECT u.id, u.national_code, u.first_name, u.last_name, u.user_type, u.region_id, u.created_at, r.region_name
+        'SELECT u.id, u.national_code, u.first_name, u.last_name, u.user_type, u.region_id, u.is_active, u.created_at, r.region_name
          FROM users u LEFT JOIN regions r ON r.region_code = u.region_id
          ORDER BY u.id DESC'
     )->fetchAll();
@@ -49,6 +49,7 @@ require __DIR__ . '/../includes/header.php';
             <th>کد ملی</th>
             <th>نقش</th>
             <th>منطقه</th>
+            <th>وضعیت</th>
             <th>تاریخ ثبت</th>
             <th class="text-start">عملیات</th>
           </tr>
@@ -61,12 +62,25 @@ require __DIR__ . '/../includes/header.php';
             <td class="ltr-text"><?= e($u['national_code']) ?></td>
             <td><span class="badge role-badge role-<?= e($u['user_type']) ?>"><?= e(user_type_label($u['user_type'])) ?></span></td>
             <td><?= $u['region_name'] ? e($u['region_name']) : '<span class="text-muted">—</span>' ?></td>
+            <td>
+              <?php if ((int)$u['is_active'] === 1): ?>
+                <span class="status-badge status-delivered">فعال</span>
+              <?php else: ?>
+                <span class="status-badge status-cancelled">غیرفعال</span>
+              <?php endif; ?>
+            </td>
             <td class="ltr-text text-muted small"><?= e(to_jalali_datetime_display($u['created_at'])) ?></td>
             <td class="text-start">
-              <a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1"
-                 href="<?= BASE_URL ?>/users/reset_password.php?id=<?= e((string)$u['id']) ?>">
-                <span class="iconify" data-icon="solar:key-bold"></span> بازنشانی رمز
-              </a>
+              <div class="d-flex gap-1 justify-content-start flex-wrap">
+                <a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+                   href="<?= BASE_URL ?>/users/edit.php?id=<?= e((string)$u['id']) ?>">
+                  <span class="iconify" data-icon="solar:pen-bold"></span> ویرایش
+                </a>
+                <a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1"
+                   href="<?= BASE_URL ?>/users/reset_password.php?id=<?= e((string)$u['id']) ?>">
+                  <span class="iconify" data-icon="solar:key-bold"></span> بازنشانی رمز
+                </a>
+              </div>
             </td>
           </tr>
           <?php endforeach; ?>

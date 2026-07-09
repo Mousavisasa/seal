@@ -28,12 +28,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $user = $stmt->fetch();
 
                 if ($user && password_verify($password, $user['password'])) {
-                    login_user($user);
-                    set_flash('success', 'خوش آمدید، ' . $user['first_name'] . ' ' . $user['last_name'] . ' عزیز.');
-                    header('Location: ' . BASE_URL . '/' . redirect_path_for_role($user['user_type']));
-                    exit;
+                    if ((int)($user['is_active'] ?? 1) === 0) {
+                        $error = 'حساب کاربری شما غیرفعال شده است. برای اطلاعات بیشتر با مدیر سامانه تماس بگیرید.';
+                    } else {
+                        login_user($user);
+                        set_flash('success', 'خوش آمدید، ' . $user['first_name'] . ' ' . $user['last_name'] . ' عزیز.');
+                        header('Location: ' . BASE_URL . '/' . redirect_path_for_role($user['user_type']));
+                        exit;
+                    }
+                } else {
+                    $error = 'نام کاربری یا رمز عبور نادرست است.';
                 }
-                $error = 'نام کاربری یا رمز عبور نادرست است.';
             } catch (PDOException $e) {
                 error_log('Login error: ' . $e->getMessage());
                 $error = 'خطایی رخ داد. لطفاً بعداً تلاش کنید.';
