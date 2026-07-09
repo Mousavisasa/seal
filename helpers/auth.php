@@ -54,6 +54,24 @@ function can_assign_driver(): bool
     return is_admin() || is_operator();
 }
 
+/** آیا کاربر جاری به بخش تعریف و مدیریت کلی پلمپ‌ها (انبار مرکزی) دسترسی دارد؟ فقط ادمین */
+function can_manage_seals_master(): bool
+{
+    return is_admin();
+}
+
+/** آیا کاربر جاری می‌تواند پلمپ را به یک منطقه تخصیص دهد یا از منطقه بازپس بگیرد؟ فقط ادمین */
+function can_assign_seal_to_region(): bool
+{
+    return is_admin();
+}
+
+/** آیا کاربر جاری می‌تواند پلمپ را به مقصد/بارنامه الصاق کند؟ ادمین یا منطقه */
+function can_attach_seal_to_waybill(): bool
+{
+    return is_admin() || is_region();
+}
+
 /** مسیر مناسب پس از ورود بر اساس نقش کاربر */
 function redirect_path_for_role(string $userType): string
 {
@@ -167,6 +185,35 @@ function require_driver_access(): void
     if (!is_driver() && !is_admin()) {
         set_flash('danger', 'شما دسترسی لازم برای این بخش را ندارید.');
         header('Location: ' . BASE_URL . '/' . redirect_path_for_role($_SESSION['user_type'] ?? ''));
+        exit;
+    }
+}
+
+/** محافظ صفحات انبار مرکزی پلمپ (تعریف/ویرایش/تخصیص به منطقه): فقط ادمین */
+function require_seals_master_access(): void
+{
+    require_login();
+    if (!can_manage_seals_master()) {
+        set_flash('danger', 'شما دسترسی لازم برای این بخش را ندارید.');
+        header('Location: ' . BASE_URL . '/' . redirect_path_for_role($_SESSION['user_type'] ?? ''));
+        exit;
+    }
+}
+
+/** محافظ صفحات الصاق پلمپ به بارنامه: ادمین یا منطقه */
+function require_seal_attach_access(): void
+{
+    require_login();
+    if (!can_attach_seal_to_waybill()) {
+        set_flash('danger', 'شما دسترسی لازم برای این بخش را ندارید.');
+        header('Location: ' . BASE_URL . '/' . redirect_path_for_role($_SESSION['user_type'] ?? ''));
+        exit;
+    }
+    if (is_region() && session_region_id() === null) {
+        logout_user();
+        session_start();
+        set_flash('danger', 'حساب کاربری شما به هیچ منطقه‌ای متصل نیست. لطفاً با مدیر سامانه تماس بگیرید.');
+        header('Location: ' . BASE_URL . '/login.php');
         exit;
     }
 }

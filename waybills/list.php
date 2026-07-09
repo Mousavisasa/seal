@@ -23,7 +23,8 @@ try {
                    opDest.first_name AS dest_operator_first, opDest.last_name AS dest_operator_last,
                    drU.first_name AS driver_first, drU.last_name AS driver_last,
                    orRg.region_name AS origin_region_name, dsRg.region_name AS destination_region_name,
-                   ol.region_id AS origin_region_code, dl.region_id AS destination_region_code
+                   ol.region_id AS origin_region_code, dl.region_id AS destination_region_code,
+                   sl.seal_id AS attached_seal_id
             FROM fuel_waybills w
             INNER JOIN locations ol ON ol.id = w.origin_location_id
             INNER JOIN locations dl ON dl.id = w.destination_location_id
@@ -32,6 +33,7 @@ try {
             LEFT JOIN users opOrig ON opOrig.id = w.origin_operator_user_id
             LEFT JOIN users opDest ON opDest.id = w.destination_operator_user_id
             LEFT JOIN users drU ON drU.id = w.driver_user_id
+            LEFT JOIN seals sl ON sl.fuel_waybill_id = w.id
             WHERE 1=1';
     $params = [];
 
@@ -137,6 +139,7 @@ require __DIR__ . '/../includes/header.php';
             <th>فرآورده</th>
             <th>تاریخ صدور</th>
             <th>وضعیت</th>
+            <th>پلمپ</th>
             <th>متصدی مبدا</th>
             <th>متصدی مقصد</th>
             <th>راننده</th>
@@ -153,6 +156,7 @@ require __DIR__ . '/../includes/header.php';
             <td><span class="product-badge"><?= e($w['product_type']) ?></span></td>
             <td class="ltr-text text-muted small"><?= e(to_jalali_display($w['issue_date'])) ?></td>
             <td><span class="status-badge <?= e($statusClassMap[$w['send_status']] ?? '') ?>"><?= e($w['send_status']) ?></span></td>
+            <td class="ltr-text"><?= $w['attached_seal_id'] ? e($w['attached_seal_id']) : '<span class="text-muted">—</span>' ?></td>
             <td><?= $w['origin_operator_first'] ? e($w['origin_operator_first'] . ' ' . $w['origin_operator_last']) : '<span class="text-muted">—</span>' ?></td>
             <td><?= $w['dest_operator_first'] ? e($w['dest_operator_first'] . ' ' . $w['dest_operator_last']) : '<span class="text-muted">—</span>' ?></td>
             <td><?= $w['driver_first'] ? e($w['driver_first'] . ' ' . $w['driver_last']) : '<span class="text-muted">—</span>' ?></td>

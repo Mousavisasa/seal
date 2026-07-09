@@ -13,6 +13,7 @@ $latest = [];
 $waybillCounts = ['total' => 0, 'ثبت شده' => 0, 'ارسال شده' => 0, 'تحویل شده' => 0, 'لغو شده' => 0];
 $productCounts = [];
 $monthlyTrend = [];
+$sealCounts = ['total' => 0, 'در انبار مرکزی' => 0, 'در انبار منطقه' => 0, 'الصاق شده' => 0, 'باطل شده' => 0, 'مفقود شده' => 0];
 
 try {
     $rows = db()->query('SELECT user_type, COUNT(*) AS c FROM users GROUP BY user_type')->fetchAll();
@@ -45,6 +46,12 @@ try {
     )->fetchAll();
     foreach ($mRows as $row) {
         $monthlyTrend[$row['ym']] = (int)$row['c'];
+    }
+
+    $sRows = db()->query('SELECT seal_status, COUNT(*) AS c FROM seals GROUP BY seal_status')->fetchAll();
+    foreach ($sRows as $row) {
+        $sealCounts[$row['seal_status']] = (int)$row['c'];
+        $sealCounts['total'] += (int)$row['c'];
     }
 } catch (PDOException $e) {
     error_log('Dashboard error: ' . $e->getMessage());
@@ -204,6 +211,19 @@ require __DIR__ . '/includes/header.php';
           <div>
             <div class="fw-bold">مدیریت بارنامه سوخت</div>
             <div class="text-muted small">فهرست و ثبت بارنامه‌ها</div>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-4">
+    <a href="<?= BASE_URL ?>/seals/list.php" class="text-decoration-none">
+      <div class="card panel-card h-100">
+        <div class="card-body d-flex align-items-center gap-3">
+          <span class="stat-icon" style="background: var(--jade-soft); color: var(--jade-dark);"><span class="iconify" data-icon="solar:shield-keyhole-bold"></span></span>
+          <div>
+            <div class="fw-bold">انبارداری پلمپ</div>
+            <div class="text-muted small">تعریف، تخصیص و الصاق پلمپ</div>
           </div>
         </div>
       </div>
@@ -374,6 +394,60 @@ require __DIR__ . '/includes/header.php';
   }
 })();
 </script>
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 mt-2">
+  <h2 class="h6 fw-bold mb-0">انبارداری پلمپ</h2>
+  <a href="<?= BASE_URL ?>/seals/create.php" class="btn btn-soft-purple d-flex align-items-center gap-2">
+    <span class="iconify" data-icon="solar:add-circle-bold"></span> پلمپ جدید
+  </a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card stat-purple h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <span class="stat-icon"><span class="iconify" data-icon="solar:box-bold"></span></span>
+        <div>
+          <div class="stat-number"><?= e((string)$sealCounts['total']) ?></div>
+          <div class="stat-label">کل پلمپ‌ها</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card stat-jade h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <span class="stat-icon"><span class="iconify" data-icon="solar:warehouse-bold"></span></span>
+        <div>
+          <div class="stat-number"><?= e((string)$sealCounts['در انبار مرکزی']) ?></div>
+          <div class="stat-label">انبار مرکزی</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card stat-purple h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <span class="stat-icon"><span class="iconify" data-icon="solar:map-point-bold"></span></span>
+        <div>
+          <div class="stat-number"><?= e((string)$sealCounts['در انبار منطقه']) ?></div>
+          <div class="stat-label">انبار مناطق</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card stat-jade h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <span class="stat-icon"><span class="iconify" data-icon="solar:link-bold"></span></span>
+        <div>
+          <div class="stat-number"><?= e((string)$sealCounts['الصاق شده']) ?></div>
+          <div class="stat-label">الصاق‌شده</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="card panel-card">
   <div class="card-header d-flex align-items-center gap-2">

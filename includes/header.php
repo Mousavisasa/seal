@@ -86,6 +86,14 @@ $active = $active ?? '';
       </li>
       <?php endif; ?>
 
+      <?php if (is_admin() || is_region()): ?>
+      <li>
+        <a href="<?= BASE_URL ?>/seals/list.php" class="<?= $active === 'seals' ? 'active' : '' ?>">
+          <span class="iconify" data-icon="solar:shield-keyhole-bold"></span> انبارداری پلمپ
+        </a>
+      </li>
+      <?php endif; ?>
+
       <?php if (is_operator()): ?>
       <li>
         <a href="<?= BASE_URL ?>/waybills/my_waybills.php" class="<?= $active === 'my-waybills' ? 'active' : '' ?>">

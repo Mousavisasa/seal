@@ -121,6 +121,64 @@ CREATE TABLE IF NOT EXISTS `fuel_waybills` (
   CONSTRAINT `chk_waybill_distance_positive` CHECK (`distance_km` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- =====================================================
+-- ماژول انبارداری پلمپ: تعریف پلمپ، تخصیص به منطقه، الصاق به بارنامه
+-- =====================================================
+
+-- ---------- جدول پلمپ‌ها ----------
+-- گردش کار: ادمین پلمپ را تعریف می‌کند (در انبار مرکزی، بدون منطقه)
+-- سپس ادمین آن را به یک منطقه تخصیص می‌دهد (انبار منطقه)
+-- سپس کاربر منطقه (یا ادمین) آن را به یک بارنامه الصاق می‌کند
+-- seal_id شناسه نمایشی و یکتای پلمپ است (روی خود پلمپ فیزیکی حک شده)
+-- seal_password رمز/کد تاییدیه پلمپ است و در فهرست‌ها نمایش داده نمی‌شود
+CREATE TABLE IF NOT EXISTS `seals` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `seal_id` VARCHAR(50) NOT NULL,
+  `seal_password` VARCHAR(255) NOT NULL,
+  `seal_status` ENUM('در انبار مرکزی','در انبار منطقه','الصاق شده','باطل شده','مفقود شده') NOT NULL DEFAULT 'در انبار مرکزی',
+  `region_id` INT NULL DEFAULT NULL,
+  `fuel_waybill_id` INT UNSIGNED NULL DEFAULT NULL,
+  `assigned_region_at` TIMESTAMP NULL DEFAULT NULL,
+  `attached_waybill_at` TIMESTAMP NULL DEFAULT NULL,
+  `created_by` INT UNSIGNED NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_seal_id` (`seal_id`),
+  UNIQUE KEY `uq_seal_waybill` (`fuel_waybill_id`),
+  KEY `idx_seal_status` (`seal_status`),
+  KEY `idx_seal_region` (`region_id`),
+  KEY `idx_seal_created_by` (`created_by`),
+  CONSTRAINT `fk_seal_region` FOREIGN KEY (`region_id`) REFERENCES `regions` (`region_code`)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT `fk_seal_waybill` FOREIGN KEY (`fuel_waybill_id`) REFERENCES `fuel_waybills` (`id`)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT `fk_seal_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------- جدول رخدادهای پلمپ (تاریخچه/ردیابی) ----------
+-- هر بار وضعیت یا محل پلمپ تغییر کند، یک رکورد این‌جا ثبت می‌شود
+CREATE TABLE IF NOT EXISTS `seal_movements` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `seal_id` INT UNSIGNED NOT NULL,
+  `action` ENUM('ایجاد','تخصیص به منطقه','بازگشت به انبار مرکزی','الصاق به بارنامه','جدا شدن از بارنامه','ابطال','اعلام مفقودی') NOT NULL,
+  `from_status` VARCHAR(50) NULL DEFAULT NULL,
+  `to_status` VARCHAR(50) NOT NULL,
+  `region_id` INT NULL DEFAULT NULL,
+  `fuel_waybill_id` INT UNSIGNED NULL DEFAULT NULL,
+  `performed_by` INT UNSIGNED NOT NULL,
+  `note` VARCHAR(255) NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_movement_seal` (`seal_id`),
+  KEY `idx_movement_performed_by` (`performed_by`),
+  CONSTRAINT `fk_movement_seal` FOREIGN KEY (`seal_id`) REFERENCES `seals` (`id`)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT `fk_movement_performed_by` FOREIGN KEY (`performed_by`) REFERENCES `users` (`id`)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ---------- داده نمونه: مناطق ----------
 INSERT INTO `regions` (`region_code`, `region_name`) VALUES
   (1, 'تهران'),
@@ -177,6 +235,13 @@ INSERT INTO `users` (`national_code`, `first_name`, `last_name`, `password`, `us
   ('3333333333', 'حسین', 'راننده', '$6$seedadminsalt$5XijZnjPea8KqKpz3rGJ9vsQkFtlkgFRS6Josf3ejEtMpWtZSjdPOm8BhFpDBJEw9TGHkQYOcAedkGym1h2cy/', 'driver', NULL),
   ('4444444444', 'سارا', 'منطقه‌ای', '$6$seedadminsalt$5XijZnjPea8KqKpz3rGJ9vsQkFtlkgFRS6Josf3ejEtMpWtZSjdPOm8BhFpDBJEw9TGHkQYOcAedkGym1h2cy/', 'region', 1);
 
+-- ---------- داده نمونه: پلمپ‌ها ----------
+-- رمز نمونه هر سه پلمپ: Seal@123 (به‌صورت هش ذخیره شده، دقیقاً مثل رمز کاربران)
+INSERT INTO `seals` (`seal_id`, `seal_password`, `seal_status`, `region_id`, `created_by`) VALUES
+  ('SEAL-0001', '$6$sealseedsalt$B7Jvp.fx4Kr01MdvaSyay9ATtmURyY3Uxhnt4R2yQKhcq2I1XIcJmD1Ni7eAVx70QDxya/OzVEU17xjvn.EKr.', 'در انبار مرکزی', NULL, 1),
+  ('SEAL-0002', '$6$sealseedsalt$B7Jvp.fx4Kr01MdvaSyay9ATtmURyY3Uxhnt4R2yQKhcq2I1XIcJmD1Ni7eAVx70QDxya/OzVEU17xjvn.EKr.', 'در انبار منطقه', 1, 1),
+  ('SEAL-0003', '$6$sealseedsalt$B7Jvp.fx4Kr01MdvaSyay9ATtmURyY3Uxhnt4R2yQKhcq2I1XIcJmD1Ni7eAVx70QDxya/OzVEU17xjvn.EKr.', 'در انبار مرکزی', NULL, 1);
+
 -- =====================================================
 -- مهاجرت برای نصب‌های قبلی (در صورت وجود دیتابیس قبلی، خطوط زیر را یک‌بار اجرا کنید):
 -- =====================================================
@@ -202,5 +267,9 @@ INSERT INTO `users` (`national_code`, `first_name`, `last_name`, `password`, `us
 -- ALTER TABLE `users`
 --   ADD COLUMN `is_active` TINYINT(1) NOT NULL DEFAULT 1 AFTER `region_id`,
 --   ADD KEY `idx_users_active` (`is_active`);
+--
+-- 5) افزودن ماژول انبارداری پلمپ (پلمپ‌ها و تاریخچه رخدادها):
+-- (کد کامل ساخت جدول در بالای همین فایل، بخش «ماژول انبارداری پلمپ» موجود است؛
+--  کافی است دو دستور CREATE TABLE مربوط به seals و seal_movements را از آن‌جا اجرا کنید.)
 
 
