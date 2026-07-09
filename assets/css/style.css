@@ -1,0 +1,276 @@
+/* =====================================================
+   سامانه مدیریت کاربران — تم یشمی و بنفش
+   شخصی‌سازی بوت‌استرپ + استایل پنل RTL
+   ===================================================== */
+
+:root {
+  --jade: #0da678;
+  --jade-dark: #087a58;
+  --jade-soft: #e2f6ef;
+  --purple: #7048c8;
+  --purple-dark: #56349e;
+  --purple-soft: #efe9fb;
+  --ink: #22303e;
+  --dim: #7a8794;
+  --surface: #f4f7f6;
+  --card-radius: 1rem;
+  --soft-shadow: 0 10px 30px -12px rgba(34, 48, 62, 0.18);
+
+  /* بازتعریف متغیرهای بوت‌استرپ */
+  --bs-primary: var(--jade);
+  --bs-primary-rgb: 13, 166, 120;
+  --bs-body-font-family: 'Vazirmatn', Tahoma, sans-serif;
+  --bs-body-color: var(--ink);
+  --bs-body-bg: var(--surface);
+}
+
+* { font-family: 'Vazirmatn', Tahoma, sans-serif; }
+
+body { background: var(--surface); color: var(--ink); }
+
+/* ---------- دکمه‌ها ---------- */
+.btn-primary {
+  --bs-btn-bg: var(--jade);
+  --bs-btn-border-color: var(--jade);
+  --bs-btn-hover-bg: var(--jade-dark);
+  --bs-btn-hover-border-color: var(--jade-dark);
+  --bs-btn-active-bg: var(--jade-dark);
+  --bs-btn-active-border-color: var(--jade-dark);
+  --bs-btn-focus-shadow-rgb: 13, 166, 120;
+  border-radius: .65rem;
+  font-weight: 600;
+}
+.btn-soft-purple {
+  background: var(--purple-soft);
+  color: var(--purple-dark);
+  border: 1px solid transparent;
+  border-radius: .55rem;
+  font-weight: 600;
+}
+.btn-soft-purple:hover { background: var(--purple); color: #fff; }
+.btn-outline-secondary { border-radius: .65rem; }
+.btn-icon { border: 0; background: transparent; color: var(--ink); }
+
+/* ---------- فرم‌ها ---------- */
+.form-control, .form-select {
+  border-radius: .65rem;
+  border-color: #dfe6e3;
+  padding: .55rem .9rem;
+}
+.form-control:focus, .form-select:focus {
+  border-color: var(--jade);
+  box-shadow: 0 0 0 .2rem rgba(13, 166, 120, .15);
+}
+.input-group-text {
+  background: var(--jade-soft);
+  border-color: #dfe6e3;
+  color: var(--jade-dark);
+  border-radius: .65rem;
+}
+.input-group .form-control { border-radius: .65rem; }
+.toggle-pass { cursor: pointer; user-select: none; }
+.form-label { font-weight: 600; font-size: .9rem; }
+.invalid-feedback { min-height: 1rem; }
+
+/* ---------- صفحه ورود ---------- */
+.auth-body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background:
+    radial-gradient(60rem 60rem at 110% -10%, rgba(112, 72, 200, .18), transparent 60%),
+    radial-gradient(50rem 50rem at -10% 110%, rgba(13, 166, 120, .20), transparent 60%),
+    var(--surface);
+}
+.auth-card {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  max-width: 860px;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  box-shadow: var(--soft-shadow);
+  background: #fff;
+}
+.auth-side {
+  flex: 1 1 45%;
+  background: linear-gradient(150deg, var(--purple) 0%, var(--purple-dark) 55%, var(--jade-dark) 130%);
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2.5rem;
+}
+.auth-side-icon { font-size: 4rem; color: rgba(255,255,255,.9); }
+.auth-form { flex: 1 1 55%; }
+
+/* ---------- چیدمان پنل ---------- */
+.panel-wrapper { display: flex; min-height: 100vh; }
+.panel-content { flex: 1; padding: 1.5rem; min-width: 0; }
+@media (min-width: 992px) { .panel-content { padding: 2rem 2.5rem; } }
+
+.panel-topbar {
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(34,48,62,.06);
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+}
+
+/* ---------- منوی کناری ---------- */
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, #2a1f4d 0%, #241a42 60%, #1d3a32 140%);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem 1rem;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+.sidebar-brand { display: flex; align-items: center; gap: .75rem; padding: .25rem .5rem 1rem; }
+.brand-mark {
+  width: 42px; height: 42px;
+  display: grid; place-items: center;
+  border-radius: .8rem;
+  background: linear-gradient(135deg, var(--jade), var(--purple));
+  font-size: 1.4rem;
+  color: #fff;
+  flex-shrink: 0;
+}
+.brand-title { font-weight: 800; font-size: .95rem; }
+.brand-sub { font-size: .72rem; color: rgba(255,255,255,.55); }
+
+.sidebar-user {
+  display: flex; align-items: center; gap: .6rem;
+  background: rgba(255,255,255,.07);
+  border-radius: .8rem;
+  padding: .6rem .8rem;
+  margin-bottom: 1rem;
+}
+.text-dim { color: rgba(255,255,255,.55); }
+
+.sidebar-nav { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .25rem; flex: 1; }
+.sidebar-nav a {
+  display: flex; align-items: center; gap: .6rem;
+  color: rgba(255,255,255,.78);
+  text-decoration: none;
+  padding: .65rem .9rem;
+  border-radius: .7rem;
+  font-size: .92rem;
+  transition: background .15s, color .15s;
+}
+.sidebar-nav a .iconify { font-size: 1.25rem; }
+.sidebar-nav a:hover { background: rgba(255,255,255,.09); color: #fff; }
+.sidebar-nav a.active {
+  background: linear-gradient(90deg, rgba(13,166,120,.85), rgba(112,72,200,.85));
+  color: #fff;
+  font-weight: 700;
+}
+.text-danger-link { color: #ff9d9d !important; }
+.text-danger-link:hover { background: rgba(255,120,120,.12) !important; }
+
+/* منوی کناری در موبایل */
+@media (max-width: 991.98px) {
+  .sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    transform: translateX(100%);
+    transition: transform .25s ease;
+    z-index: 1040;
+    height: 100%;
+  }
+  [dir="rtl"] .sidebar { transform: translateX(100%); }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-backdrop {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(20, 20, 35, .5);
+    z-index: 1035;
+  }
+  .sidebar-backdrop.show { display: block; }
+}
+
+/* ---------- کارت‌ها ---------- */
+.panel-card {
+  border: 0;
+  border-radius: var(--card-radius);
+  box-shadow: var(--soft-shadow);
+  background: #fff;
+}
+.panel-card .card-header {
+  background: #fff;
+  border-bottom: 1px solid #eef2f0;
+  border-radius: var(--card-radius) var(--card-radius) 0 0 !important;
+  padding: 1rem 1.25rem;
+}
+
+.stat-card {
+  border: 0;
+  border-radius: var(--card-radius);
+  box-shadow: var(--soft-shadow);
+}
+.stat-icon {
+  width: 52px; height: 52px;
+  display: grid; place-items: center;
+  border-radius: .9rem;
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+.stat-jade { background: linear-gradient(135deg, #ffffff 60%, var(--jade-soft)); }
+.stat-jade .stat-icon { background: var(--jade-soft); color: var(--jade-dark); }
+.stat-purple { background: linear-gradient(135deg, #ffffff 60%, var(--purple-soft)); }
+.stat-purple .stat-icon { background: var(--purple-soft); color: var(--purple-dark); }
+.stat-number { font-size: 1.6rem; font-weight: 800; line-height: 1.1; }
+.stat-label { color: var(--dim); font-size: .85rem; }
+
+/* ---------- جدول ---------- */
+.table thead th {
+  background: var(--jade-soft);
+  color: var(--jade-dark);
+  font-weight: 700;
+  font-size: .85rem;
+  border: 0;
+  white-space: nowrap;
+}
+.table td { border-color: #f0f3f2; }
+.ltr-text { direction: ltr; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---------- نشان نقش ---------- */
+.role-badge { font-weight: 600; font-size: .78rem; padding: .4em .8em; border-radius: 2rem; }
+.role-admin    { background: var(--purple-soft); color: var(--purple-dark); }
+.role-driver   { background: var(--jade-soft); color: var(--jade-dark); }
+.role-operator { background: #fff3e0; color: #b26a00; }
+.role-region   { background: #e3f2fd; color: #1565c0; }
+
+/* ---------- آلرت‌ها ---------- */
+.alert { border: 0; border-radius: .8rem; box-shadow: 0 4px 14px -8px rgba(34,48,62,.2); }
+.alert-success { background: var(--jade-soft); color: var(--jade-dark); }
+.alert-danger  { background: #fdecec; color: #b02a37; }
+.alert-warning { background: #fff7e0; color: #997404; }
+.alert-info    { background: var(--purple-soft); color: var(--purple-dark); }
+
+.text-jade { color: var(--jade-dark); }
+.text-purple { color: var(--purple-dark); }
+
+/* ---------- صفحه تست وب‌سرویس ---------- */
+.ltr-code { direction: ltr; text-align: left; font-family: 'Consolas', 'Courier New', monospace; }
+.api-response, .api-doc-code {
+  background: #1e1b32;
+  color: #d9f4ea;
+  border-radius: .8rem;
+  padding: 1rem 1.25rem;
+  font-size: .85rem;
+  line-height: 1.7;
+  overflow-x: auto;
+  white-space: pre;
+  border-inline-start: 4px solid var(--jade);
+}
+.api-doc-code { border-inline-start-color: var(--purple); }
+.badge-status-ok   { background: var(--jade-soft); color: var(--jade-dark); }
+.badge-status-err  { background: #fdecec; color: #b02a37; }
+.badge-status-warn { background: #fff7e0; color: #997404; }
