@@ -89,11 +89,21 @@ function gregorian_to_jalali(int $gy, int $gm, int $gd): array
 /** تبدیل تاریخ میلادی Y-m-d به رشته شمسی Y/m/d برای نمایش */
 function to_jalali_display(?string $gregorianDate): string
 {
-    if (!$gregorianDate || !preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $gregorianDate, $m)) {
+    if (!$gregorianDate || !preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $gregorianDate, $m)) {
         return '';
     }
     [$jy, $jm, $jd] = gregorian_to_jalali((int)$m[1], (int)$m[2], (int)$m[3]);
     return sprintf('%04d/%02d/%02d', $jy, $jm, $jd);
+}
+
+/** تبدیل تاریخ‌زمان میلادی Y-m-d H:i:s به رشته شمسی Y/m/d H:i برای نمایش */
+function to_jalali_datetime_display(?string $gregorianDateTime): string
+{
+    if (!$gregorianDateTime || !preg_match('/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/', $gregorianDateTime, $m)) {
+        return '';
+    }
+    [$jy, $jm, $jd] = gregorian_to_jalali((int)$m[1], (int)$m[2], (int)$m[3]);
+    return sprintf('%04d/%02d/%02d %02d:%02d', $jy, $jm, $jd, (int)$m[4], (int)$m[5]);
 }
 
 /** تبدیل رشته شمسی (Y/m/d یا Y-m-d، ارقام فارسی هم پذیرفته می‌شود) به میلادی Y-m-d برای ذخیره در دیتابیس */

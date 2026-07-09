@@ -4,6 +4,7 @@
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../helpers/auth.php';
+require_once __DIR__ . '/../helpers/jalali.php';
 
 require_admin();
 
@@ -54,7 +55,7 @@ require __DIR__ . '/../includes/header.php';
             <td class="fw-bold"><?= e($u['first_name'] . ' ' . $u['last_name']) ?></td>
             <td class="ltr-text"><?= e($u['national_code']) ?></td>
             <td><span class="badge role-badge role-<?= e($u['user_type']) ?>"><?= e(user_type_label($u['user_type'])) ?></span></td>
-            <td class="ltr-text text-muted small"><?= e($u['created_at']) ?></td>
+            <td class="ltr-text text-muted small"><?= e(to_jalali_datetime_display($u['created_at'])) ?></td>
             <td class="text-start">
               <a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1"
                  href="<?= BASE_URL ?>/users/reset_password.php?id=<?= e((string)$u['id']) ?>">

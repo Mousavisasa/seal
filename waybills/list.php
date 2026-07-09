@@ -145,8 +145,12 @@ require __DIR__ . '/../includes/header.php';
             <td><?= $w['operator_first'] ? e($w['operator_first'] . ' ' . $w['operator_last']) : '<span class="text-muted">—</span>' ?></td>
             <td><?= $w['driver_first'] ? e($w['driver_first'] . ' ' . $w['driver_last']) : '<span class="text-muted">—</span>' ?></td>
             <td class="text-start">
-              <div class="d-flex gap-1 justify-content-start">
+              <div class="d-flex gap-1 justify-content-start flex-wrap">
                 <a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1"
+                   href="<?= BASE_URL ?>/waybills/assign_operator.php?id=<?= e((string)$w['id']) ?>">
+                  <span class="iconify" data-icon="solar:user-id-bold"></span> متصدی
+                </a>
+                <a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
                    href="<?= BASE_URL ?>/waybills/edit.php?id=<?= e((string)$w['id']) ?>">
                   <span class="iconify" data-icon="solar:pen-bold"></span> ویرایش
                 </a>

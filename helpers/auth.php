@@ -24,10 +24,59 @@ function is_region(): bool
     return is_logged_in() && ($_SESSION['user_type'] ?? '') === 'region';
 }
 
-/** آیا کاربر جاری به ماژول بارنامه سوخت دسترسی دارد؟ (ادمین یا منطقه) */
+/** آیا کاربر جاری نقش «متصدی» دارد؟ */
+function is_operator(): bool
+{
+    return is_logged_in() && ($_SESSION['user_type'] ?? '') === 'operator';
+}
+
+/** آیا کاربر جاری نقش «راننده» دارد؟ */
+function is_driver(): bool
+{
+    return is_logged_in() && ($_SESSION['user_type'] ?? '') === 'driver';
+}
+
+/** آیا کاربر جاری به ماژول بارنامه سوخت (فهرست/ایجاد/ویرایش/حذف) دسترسی دارد؟ (ادمین یا منطقه) */
 function can_access_waybill_module(): bool
 {
     return is_admin() || is_region();
+}
+
+/** آیا کاربر جاری می‌تواند متصدی را به بارنامه تخصیص دهد؟ (ادمین یا منطقه) */
+function can_assign_operator(): bool
+{
+    return is_admin() || is_region();
+}
+
+/** آیا کاربر جاری می‌تواند راننده را به بارنامه تخصیص دهد؟ (ادمین یا متصدی) */
+function can_assign_driver(): bool
+{
+    return is_admin() || is_operator();
+}
+
+/** مسیر مناسب پس از ورود بر اساس نقش کاربر */
+function redirect_path_for_role(string $userType): string
+{
+    switch ($userType) {
+        case 'driver':
+            return 'waybills/my_trips.php';
+        case 'operator':
+            return 'waybills/my_waybills.php';
+        case 'region':
+            return 'waybills/list.php';
+        default:
+            return 'dashboard.php';
+    }
+}
+
+/** محافظ عمومی: فقط کاربر واردشده */
+function require_login(): void
+{
+    if (!is_logged_in()) {
+        set_flash('warning', 'برای دسترسی به این بخش ابتدا وارد شوید.');
+        header('Location: ' . BASE_URL . '/login.php');
+        exit;
+    }
 }
 
 /** محافظ صفحات ادمین: در صورت نبود دسترسی، هدایت به صفحه ورود */
@@ -43,14 +92,43 @@ function require_admin(): void
 /** محافظ صفحات ماژول بارنامه سوخت: فقط ادمین یا منطقه */
 function require_waybill_access(): void
 {
-    if (!is_logged_in()) {
-        set_flash('warning', 'برای دسترسی به این بخش ابتدا وارد شوید.');
-        header('Location: ' . BASE_URL . '/login.php');
-        exit;
-    }
+    require_login();
     if (!can_access_waybill_module()) {
         set_flash('danger', 'شما دسترسی لازم برای این بخش را ندارید.');
-        header('Location: ' . BASE_URL . '/dashboard.php');
+        header('Location: ' . BASE_URL . '/' . redirect_path_for_role($_SESSION['user_type'] ?? '')); 
+        exit;
+    }
+}
+
+/** محافظ صفحات تخصیص متصدی: فقط ادمین یا منطقه */
+function require_assign_operator_access(): void
+{
+    require_login();
+    if (!can_assign_operator()) {
+        set_flash('danger', 'شما دسترسی لازم برای این بخش را ندارید.');
+        header('Location: ' . BASE_URL . '/' . redirect_path_for_role($_SESSION['user_type'] ?? ''));
+        exit;
+    }
+}
+
+/** محافظ صفحات تخصیص راننده: فقط ادمین یا متصدی */
+function require_assign_driver_access(): void
+{
+    require_login();
+    if (!can_assign_driver()) {
+        set_flash('danger', 'شما دسترسی لازم برای این بخش را ندارید.');
+        header('Location: ' . BASE_URL . '/' . redirect_path_for_role($_SESSION['user_type'] ?? ''));
+        exit;
+    }
+}
+
+/** محافظ صفحه راننده: فقط کاربر با نقش راننده (یا ادمین برای بازبینی) */
+function require_driver_access(): void
+{
+    require_login();
+    if (!is_driver() && !is_admin()) {
+        set_flash('danger', 'شما دسترسی لازم برای این بخش را ندارید.');
+        header('Location: ' . BASE_URL . '/' . redirect_path_for_role($_SESSION['user_type'] ?? ''));
         exit;
     }
 }

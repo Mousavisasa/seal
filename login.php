@@ -1,12 +1,12 @@
 <?php
 /**
- * صفحه ورود ادمین به پنل
+ * صفحه ورود به پنل (همه نقش‌ها: ادمین، منطقه، متصدی، راننده)
  */
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/helpers/auth.php';
 
-if (is_admin()) {
-    header('Location: ' . BASE_URL . '/dashboard.php');
+if (is_logged_in()) {
+    header('Location: ' . BASE_URL . '/' . redirect_path_for_role($_SESSION['user_type'] ?? ''));
     exit;
 }
 
@@ -27,13 +27,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$username]);
                 $user = $stmt->fetch();
 
-                if ($user && password_verify($password, $user['password']) && $user['user_type'] === 'admin') {
+                if ($user && password_verify($password, $user['password'])) {
                     login_user($user);
                     set_flash('success', 'خوش آمدید، ' . $user['first_name'] . ' ' . $user['last_name'] . ' عزیز.');
-                    header('Location: ' . BASE_URL . '/dashboard.php');
+                    header('Location: ' . BASE_URL . '/' . redirect_path_for_role($user['user_type']));
                     exit;
                 }
-                $error = 'نام کاربری یا رمز عبور نادرست است یا دسترسی ادمین ندارید.';
+                $error = 'نام کاربری یا رمز عبور نادرست است.';
             } catch (PDOException $e) {
                 error_log('Login error: ' . $e->getMessage());
                 $error = 'خطایی رخ داد. لطفاً بعداً تلاش کنید.';
@@ -64,7 +64,7 @@ $flash = get_flash();
   </div>
   <div class="auth-form p-4 p-md-5">
     <h1 class="h4 fw-bold mb-1">ورود به پنل مدیریت</h1>
-    <p class="text-muted small mb-4">برای ادامه، اطلاعات حساب ادمین را وارد کنید.</p>
+    <p class="text-muted small mb-4">برای ادامه، کد ملی و رمز عبور خود را وارد کنید.</p>
 
     <?php if ($flash): ?>
       <div class="alert alert-<?= e($flash['type']) ?> d-flex align-items-center gap-2">

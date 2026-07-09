@@ -49,6 +49,7 @@ $active = $active ?? '';
     </div>
 
     <ul class="sidebar-nav">
+      <?php if (is_admin()): ?>
       <li>
         <a href="<?= BASE_URL ?>/dashboard.php" class="<?= $active === 'dashboard' ? 'active' : '' ?>">
           <span class="iconify" data-icon="solar:widget-5-bold"></span> داشبورد
@@ -64,6 +65,8 @@ $active = $active ?? '';
           <span class="iconify" data-icon="solar:user-plus-rounded-bold"></span> ایجاد کاربر
         </a>
       </li>
+      <?php endif; ?>
+
       <?php if (can_access_waybill_module()): ?>
       <li>
         <a href="<?= BASE_URL ?>/regions/list.php" class="<?= $active === 'regions' ? 'active' : '' ?>">
@@ -81,11 +84,31 @@ $active = $active ?? '';
         </a>
       </li>
       <?php endif; ?>
+
+      <?php if (is_operator()): ?>
+      <li>
+        <a href="<?= BASE_URL ?>/waybills/my_waybills.php" class="<?= $active === 'my-waybills' ? 'active' : '' ?>">
+          <span class="iconify" data-icon="solar:fuel-bold"></span> بارنامه‌های من
+        </a>
+      </li>
+      <?php endif; ?>
+
+      <?php if (is_driver()): ?>
+      <li>
+        <a href="<?= BASE_URL ?>/waybills/my_trips.php" class="<?= $active === 'my-trips' ? 'active' : '' ?>">
+          <span class="iconify" data-icon="solar:bus-bold"></span> سفرهای من
+        </a>
+      </li>
+      <?php endif; ?>
+
+      <?php if (is_admin()): ?>
       <li>
         <a href="<?= BASE_URL ?>/api_test.php" class="<?= $active === 'api' ? 'active' : '' ?>">
           <span class="iconify" data-icon="solar:code-square-bold"></span> تست وب‌سرویس
         </a>
       </li>
+      <?php endif; ?>
+
       <li class="mt-auto">
         <a href="<?= BASE_URL ?>/logout.php" class="text-danger-link">
           <span class="iconify" data-icon="solar:logout-2-bold"></span> خروج

@@ -79,6 +79,8 @@ CREATE TABLE IF NOT EXISTS `fuel_waybills` (
   `send_status` ENUM('ثبت شده','ارسال شده','تحویل شده','لغو شده') NOT NULL DEFAULT 'ثبت شده',
   `sender_operator_user_id` INT UNSIGNED NULL DEFAULT NULL,
   `driver_user_id` INT UNSIGNED NULL DEFAULT NULL,
+  `trip_started_at` TIMESTAMP NULL DEFAULT NULL,
+  `trip_ended_at` TIMESTAMP NULL DEFAULT NULL,
   `created_by` INT UNSIGNED NOT NULL,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -158,5 +160,14 @@ INSERT INTO `users` (`national_code`, `first_name`, `last_name`, `password`, `us
   ('2222222222', 'رضا', 'متصدی', '$6$seedadminsalt$5XijZnjPea8KqKpz3rGJ9vsQkFtlkgFRS6Josf3ejEtMpWtZSjdPOm8BhFpDBJEw9TGHkQYOcAedkGym1h2cy/', 'operator'),
   ('3333333333', 'حسین', 'راننده', '$6$seedadminsalt$5XijZnjPea8KqKpz3rGJ9vsQkFtlkgFRS6Josf3ejEtMpWtZSjdPOm8BhFpDBJEw9TGHkQYOcAedkGym1h2cy/', 'driver'),
   ('4444444444', 'سارا', 'منطقه‌ای', '$6$seedadminsalt$5XijZnjPea8KqKpz3rGJ9vsQkFtlkgFRS6Josf3ejEtMpWtZSjdPOm8BhFpDBJEw9TGHkQYOcAedkGym1h2cy/', 'region');
+
+-- =====================================================
+-- مهاجرت برای نصب‌های قبلی: اگر جدول fuel_waybills از قبل
+-- بدون ستون‌های trip_started_at / trip_ended_at ساخته شده،
+-- خطوط زیر را یک‌بار اجرا کنید (در صورت نبود ستون‌ها):
+-- =====================================================
+-- ALTER TABLE `fuel_waybills`
+--   ADD COLUMN `trip_started_at` TIMESTAMP NULL DEFAULT NULL AFTER `driver_user_id`,
+--   ADD COLUMN `trip_ended_at` TIMESTAMP NULL DEFAULT NULL AFTER `trip_started_at`;
 
 
