@@ -1,9 +1,14 @@
 <?php
 /**
  * ایجاد بارنامه سوخت جدید
+ * نکات این نسخه:
+ * - انتخاب متصدی ارسال و راننده اختیاری است (الزامی نیست)
+ * - کد منطقه مبدا/مقصد دریافت نمی‌شود؛ از طریق مکان انتخاب‌شده (locations.region_id) مشخص می‌شود
+ * - تاریخ صدور به‌صورت شمسی از کاربر گرفته و به میلادی تبدیل می‌شود
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../helpers/auth.php';
+require_once __DIR__ . '/../helpers/jalali.php';
 
 require_waybill_access();
 
@@ -14,22 +19,22 @@ $old = [
     'distance_km'              => '',
     'product_type'             => '',
     'waybill_number'           => '',
-    'issue_date'               => date('Y-m-d'),
+    'issue_date_jalali'        => today_jalali(),
     'send_status'               => 'ثبت شده',
     'sender_operator_user_id'  => '',
     'driver_user_id'            => '',
-    'origin_region_id'          => '',
-    'destination_region_id'     => '',
 ];
 
 $locations = [];
-$regions = [];
 $operators = [];
 $drivers = [];
 
 try {
-    $locations = db()->query('SELECT id, location_code, title FROM locations ORDER BY title')->fetchAll();
-    $regions   = db()->query('SELECT id, region_code, region_name FROM regions ORDER BY region_name')->fetchAll();
+    $locations = db()->query(
+        'SELECT l.id, l.location_code, l.title, l.region_id, r.region_name
+         FROM locations l INNER JOIN regions r ON r.region_code = l.region_id
+         ORDER BY l.title'
+    )->fetchAll();
     $operators = db()->query("SELECT id, national_code, first_name, last_name FROM users WHERE user_type = 'operator' ORDER BY first_name")->fetchAll();
     $drivers   = db()->query("SELECT id, national_code, first_name, last_name FROM users WHERE user_type = 'driver' ORDER BY first_name")->fetchAll();
 } catch (PDOException $e) {
@@ -46,14 +51,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $old['distance_km']              = trim((string)($_POST['distance_km'] ?? ''));
         $old['product_type']             = (string)($_POST['product_type'] ?? '');
         $old['waybill_number']           = trim((string)($_POST['waybill_number'] ?? ''));
-        $old['issue_date']               = trim((string)($_POST['issue_date'] ?? ''));
+        $old['issue_date_jalali']        = trim((string)($_POST['issue_date_jalali'] ?? ''));
         $old['send_status']              = (string)($_POST['send_status'] ?? '');
-        $old['sender_operator_user_id']  = (string)($_POST['sender_operator_user_id'] ?? '');
-        $old['driver_user_id']            = (string)($_POST['driver_user_id'] ?? '');
-        $old['origin_region_id']          = (string)($_POST['origin_region_id'] ?? '');
-        $old['destination_region_id']     = (string)($_POST['destination_region_id'] ?? '');
+        $old['sender_operator_user_id']  = trim((string)($_POST['sender_operator_user_id'] ?? ''));
+        $old['driver_user_id']            = trim((string)($_POST['driver_user_id'] ?? ''));
 
-        // اعتبارسنجی فیلدهای الزامی و فرمت مقادیر
+        // اعتبارسنجی فیلدهای الزامی
         if ($old['waybill_number'] === '' || mb_strlen($old['waybill_number']) > 50) {
             $errors[] = 'شماره بارنامه الزامی است و باید حداکثر ۵۰ کاراکتر باشد.';
         }
@@ -63,9 +66,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!in_array($old['product_type'], PRODUCT_TYPES, true)) {
             $errors[] = 'نوع فرآورده انتخاب‌شده معتبر نیست.';
         }
-        if (!is_valid_date($old['issue_date'])) {
+
+        $issueDateGregorian = null;
+        if (!is_valid_jalali_date($old['issue_date_jalali'])) {
             $errors[] = 'تاریخ صدور بارنامه معتبر نیست.';
+        } else {
+            $issueDateGregorian = jalali_to_gregorian_string($old['issue_date_jalali']);
         }
+
         if (!in_array($old['send_status'], SEND_STATUSES, true)) {
             $errors[] = 'وضعیت ارسال انتخاب‌شده معتبر نیست.';
         }
@@ -75,20 +83,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ((int)$old['destination_location_id'] <= 0) {
             $errors[] = 'انتخاب مقصد الزامی است.';
         }
-        if ((int)$old['origin_region_id'] <= 0) {
-            $errors[] = 'انتخاب منطقه مبدا الزامی است.';
-        }
-        if ((int)$old['destination_region_id'] <= 0) {
-            $errors[] = 'انتخاب منطقه مقصد الزامی است.';
-        }
-        if ((int)$old['sender_operator_user_id'] <= 0) {
-            $errors[] = 'انتخاب متصدی ارسال الزامی است.';
-        }
-        if ((int)$old['driver_user_id'] <= 0) {
-            $errors[] = 'انتخاب راننده حمل‌کننده الزامی است.';
-        }
 
-        // بررسی صحت روابط در پایگاه داده
+        // متصدی و راننده اختیاری هستند؛ فقط در صورت انتخاب، اعتبارسنجی می‌شوند
+        $operatorId = $old['sender_operator_user_id'] !== '' ? (int)$old['sender_operator_user_id'] : null;
+        $driverId   = $old['driver_user_id'] !== '' ? (int)$old['driver_user_id'] : null;
+
         if (!$errors) {
             try {
                 $pdo = db();
@@ -104,27 +103,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $errors[] = 'مقصد انتخاب‌شده معتبر نیست.';
                 }
 
-                $stmt = $pdo->prepare('SELECT id FROM regions WHERE id = ? LIMIT 1');
-                $stmt->execute([(int)$old['origin_region_id']]);
-                if (!$stmt->fetch()) {
-                    $errors[] = 'منطقه مبدا انتخاب‌شده معتبر نیست.';
+                if ($operatorId !== null) {
+                    $stmt = $pdo->prepare("SELECT id FROM users WHERE id = ? AND user_type = 'operator' LIMIT 1");
+                    $stmt->execute([$operatorId]);
+                    if (!$stmt->fetch()) {
+                        $errors[] = 'کاربر متصدی انتخاب‌شده معتبر نیست یا نقش متصدی ندارد.';
+                    }
                 }
 
-                $stmt->execute([(int)$old['destination_region_id']]);
-                if (!$stmt->fetch()) {
-                    $errors[] = 'منطقه مقصد انتخاب‌شده معتبر نیست.';
-                }
-
-                $stmt = $pdo->prepare("SELECT id FROM users WHERE id = ? AND user_type = 'operator' LIMIT 1");
-                $stmt->execute([(int)$old['sender_operator_user_id']]);
-                if (!$stmt->fetch()) {
-                    $errors[] = 'کاربر متصدی انتخاب‌شده معتبر نیست یا نقش متصدی ندارد.';
-                }
-
-                $stmt = $pdo->prepare("SELECT id FROM users WHERE id = ? AND user_type = 'driver' LIMIT 1");
-                $stmt->execute([(int)$old['driver_user_id']]);
-                if (!$stmt->fetch()) {
-                    $errors[] = 'راننده انتخاب‌شده معتبر نیست یا نقش راننده ندارد.';
+                if ($driverId !== null) {
+                    $stmt = $pdo->prepare("SELECT id FROM users WHERE id = ? AND user_type = 'driver' LIMIT 1");
+                    $stmt->execute([$driverId]);
+                    if (!$stmt->fetch()) {
+                        $errors[] = 'راننده انتخاب‌شده معتبر نیست یا نقش راننده ندارد.';
+                    }
                 }
             } catch (PDOException $e) {
                 error_log('Waybill relation validate error: ' . $e->getMessage());
@@ -144,8 +136,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'INSERT INTO fuel_waybills
                             (origin_location_id, destination_location_id, distance_km, product_type,
                              waybill_number, issue_date, send_status, sender_operator_user_id,
-                             driver_user_id, origin_region_id, destination_region_id, created_by)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                             driver_user_id, created_by)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
                     );
                     $stmt->execute([
                         (int)$old['origin_location_id'],
@@ -153,12 +145,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         (float)$old['distance_km'],
                         $old['product_type'],
                         $old['waybill_number'],
-                        $old['issue_date'],
+                        $issueDateGregorian,
                         $old['send_status'],
-                        (int)$old['sender_operator_user_id'],
-                        (int)$old['driver_user_id'],
-                        (int)$old['origin_region_id'],
-                        (int)$old['destination_region_id'],
+                        $operatorId,
+                        $driverId,
                         (int)($_SESSION['user_id'] ?? 0),
                     ]);
                     set_flash('success', 'بارنامه «' . $old['waybill_number'] . '» با موفقیت ثبت شد.');
@@ -210,12 +200,14 @@ require __DIR__ . '/../includes/header.php';
         </div>
 
         <div class="col-md-6">
-          <label class="form-label" for="issue_date">تاریخ صدور بارنامه</label>
+          <label class="form-label" for="issue_date_jalali">تاریخ صدور بارنامه</label>
           <div class="input-group">
             <span class="input-group-text"><span class="iconify" data-icon="solar:calendar-bold"></span></span>
-            <input type="date" class="form-control ltr-text" id="issue_date" name="issue_date" required
-                   value="<?= e($old['issue_date']) ?>">
+            <input type="text" class="form-control ltr-text" id="issue_date_jalali" name="issue_date_jalali" required
+                   autocomplete="off" data-jalali-datepicker
+                   value="<?= e($old['issue_date_jalali']) ?>" placeholder="مثلاً 1405/04/18">
           </div>
+          <div class="form-text">فرمت: سال/ماه/روز (تقویم شمسی)</div>
         </div>
 
         <div class="col-md-6">
@@ -226,7 +218,7 @@ require __DIR__ . '/../includes/header.php';
               <option value="">— انتخاب کنید —</option>
               <?php foreach ($locations as $l): ?>
                 <option value="<?= e((string)$l['id']) ?>" <?= (string)$l['id'] === $old['origin_location_id'] ? 'selected' : '' ?>>
-                  <?= e($l['title']) ?> (<?= e($l['location_code']) ?>)
+                  <?= e($l['title']) ?> (<?= e($l['location_code']) ?>) — <?= e($l['region_name']) ?>
                 </option>
               <?php endforeach; ?>
             </select>
@@ -241,37 +233,7 @@ require __DIR__ . '/../includes/header.php';
               <option value="">— انتخاب کنید —</option>
               <?php foreach ($locations as $l): ?>
                 <option value="<?= e((string)$l['id']) ?>" <?= (string)$l['id'] === $old['destination_location_id'] ? 'selected' : '' ?>>
-                  <?= e($l['title']) ?> (<?= e($l['location_code']) ?>)
-                </option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-        </div>
-
-        <div class="col-md-6">
-          <label class="form-label" for="origin_region_id">کد منطقه مبدا</label>
-          <div class="input-group">
-            <span class="input-group-text"><span class="iconify" data-icon="solar:map-point-bold"></span></span>
-            <select class="form-select" id="origin_region_id" name="origin_region_id" required>
-              <option value="">— انتخاب کنید —</option>
-              <?php foreach ($regions as $r): ?>
-                <option value="<?= e((string)$r['id']) ?>" <?= (string)$r['id'] === $old['origin_region_id'] ? 'selected' : '' ?>>
-                  <?= e($r['region_name']) ?> (<?= e($r['region_code']) ?>)
-                </option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-        </div>
-
-        <div class="col-md-6">
-          <label class="form-label" for="destination_region_id">کد منطقه مقصد</label>
-          <div class="input-group">
-            <span class="input-group-text"><span class="iconify" data-icon="solar:map-point-bold"></span></span>
-            <select class="form-select" id="destination_region_id" name="destination_region_id" required>
-              <option value="">— انتخاب کنید —</option>
-              <?php foreach ($regions as $r): ?>
-                <option value="<?= e((string)$r['id']) ?>" <?= (string)$r['id'] === $old['destination_region_id'] ? 'selected' : '' ?>>
-                  <?= e($r['region_name']) ?> (<?= e($r['region_code']) ?>)
+                  <?= e($l['title']) ?> (<?= e($l['location_code']) ?>) — <?= e($l['region_name']) ?>
                 </option>
               <?php endforeach; ?>
             </select>
@@ -313,11 +275,11 @@ require __DIR__ . '/../includes/header.php';
         </div>
 
         <div class="col-md-6">
-          <label class="form-label" for="sender_operator_user_id">کد کاربر متصدی ارسال</label>
+          <label class="form-label" for="sender_operator_user_id">کد کاربر متصدی ارسال <span class="text-muted small">(اختیاری)</span></label>
           <div class="input-group">
             <span class="input-group-text"><span class="iconify" data-icon="solar:user-id-bold"></span></span>
-            <select class="form-select" id="sender_operator_user_id" name="sender_operator_user_id" required>
-              <option value="">— انتخاب کنید —</option>
+            <select class="form-select" id="sender_operator_user_id" name="sender_operator_user_id">
+              <option value="">— بدون متصدی —</option>
               <?php foreach ($operators as $u): ?>
                 <option value="<?= e((string)$u['id']) ?>" <?= (string)$u['id'] === $old['sender_operator_user_id'] ? 'selected' : '' ?>>
                   <?= e($u['first_name'] . ' ' . $u['last_name']) ?> (<?= e($u['national_code']) ?>)
@@ -325,17 +287,14 @@ require __DIR__ . '/../includes/header.php';
               <?php endforeach; ?>
             </select>
           </div>
-          <?php if (!$operators): ?>
-            <div class="form-text text-warning">هیچ کاربر متصدی‌ای در سامانه ثبت نشده است.</div>
-          <?php endif; ?>
         </div>
 
         <div class="col-md-6">
-          <label class="form-label" for="driver_user_id">کد راننده حمل‌کننده</label>
+          <label class="form-label" for="driver_user_id">کد راننده حمل‌کننده <span class="text-muted small">(اختیاری)</span></label>
           <div class="input-group">
             <span class="input-group-text"><span class="iconify" data-icon="solar:bus-bold"></span></span>
-            <select class="form-select" id="driver_user_id" name="driver_user_id" required>
-              <option value="">— انتخاب کنید —</option>
+            <select class="form-select" id="driver_user_id" name="driver_user_id">
+              <option value="">— بدون راننده —</option>
               <?php foreach ($drivers as $u): ?>
                 <option value="<?= e((string)$u['id']) ?>" <?= (string)$u['id'] === $old['driver_user_id'] ? 'selected' : '' ?>>
                   <?= e($u['first_name'] . ' ' . $u['last_name']) ?> (<?= e($u['national_code']) ?>)
@@ -343,9 +302,6 @@ require __DIR__ . '/../includes/header.php';
               <?php endforeach; ?>
             </select>
           </div>
-          <?php if (!$drivers): ?>
-            <div class="form-text text-warning">هیچ راننده‌ای در سامانه ثبت نشده است.</div>
-          <?php endif; ?>
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 <?php
 /**
  * فهرست مبادی/مقاصد با جستجو و فیلتر منطقه
+ * locations.region_id به regions.region_code ارجاع دارد
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../helpers/auth.php';
@@ -13,11 +14,11 @@ $locations = [];
 $regions = [];
 
 try {
-    $regions = db()->query('SELECT id, region_code, region_name FROM regions ORDER BY region_name')->fetchAll();
+    $regions = db()->query('SELECT region_code, region_name FROM regions ORDER BY region_name')->fetchAll();
 
-    $sql = 'SELECT l.*, r.region_name, r.region_code
+    $sql = 'SELECT l.*, r.region_name
             FROM locations l
-            INNER JOIN regions r ON r.id = l.region_id
+            INNER JOIN regions r ON r.region_code = l.region_id
             WHERE 1=1';
     $params = [];
 
@@ -72,8 +73,8 @@ require __DIR__ . '/../includes/header.php';
       <select class="form-select" id="region_id" name="region_id">
         <option value="0">همه مناطق</option>
         <?php foreach ($regions as $r): ?>
-          <option value="<?= e((string)$r['id']) ?>" <?= $regionFilter === (int)$r['id'] ? 'selected' : '' ?>>
-            <?= e($r['region_name']) ?> (<?= e($r['region_code']) ?>)
+          <option value="<?= e((string)$r['region_code']) ?>" <?= $regionFilter === (int)$r['region_code'] ? 'selected' : '' ?>>
+            <?= e($r['region_name']) ?> (<?= e((string)$r['region_code']) ?>)
           </option>
         <?php endforeach; ?>
       </select>
@@ -109,7 +110,9 @@ require __DIR__ . '/../includes/header.php';
             <td class="ltr-text fw-bold"><?= e($l['location_code']) ?></td>
             <td><?= e($l['title']) ?></td>
             <td><span class="badge role-badge role-region"><?= e($l['region_name']) ?></span></td>
-            <td class="ltr-text text-muted small"><?= e($l['geo_location'] ?: '—') ?></td>
+            <td class="ltr-text text-muted small">
+              <?= ((float)$l['lat'] !== 0.0 || (float)$l['lon'] !== 0.0) ? e($l['lat'] . ', ' . $l['lon']) : '—' ?>
+            </td>
             <td class="text-start">
               <a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1"
                  href="<?= BASE_URL ?>/locations/edit.php?id=<?= e((string)$l['id']) ?>">

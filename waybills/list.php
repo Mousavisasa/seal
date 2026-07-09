@@ -1,9 +1,12 @@
 <?php
 /**
  * فهرست بارنامه‌های سوخت با جستجو و فیلتر وضعیت/فرآورده
+ * منطقه مبدا/مقصد از طریق locations.region_id به‌دست می‌آید (بدون ستون جداگانه در fuel_waybills)
+ * تاریخ صدور به شمسی نمایش داده می‌شود
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../helpers/auth.php';
+require_once __DIR__ . '/../helpers/jalali.php';
 
 require_waybill_access();
 
@@ -21,10 +24,10 @@ try {
             FROM fuel_waybills w
             INNER JOIN locations ol ON ol.id = w.origin_location_id
             INNER JOIN locations dl ON dl.id = w.destination_location_id
-            INNER JOIN users opU ON opU.id = w.sender_operator_user_id
-            INNER JOIN users drU ON drU.id = w.driver_user_id
-            INNER JOIN regions orRg ON orRg.id = w.origin_region_id
-            INNER JOIN regions dsRg ON dsRg.id = w.destination_region_id
+            INNER JOIN regions orRg ON orRg.region_code = ol.region_id
+            INNER JOIN regions dsRg ON dsRg.region_code = dl.region_id
+            LEFT JOIN users opU ON opU.id = w.sender_operator_user_id
+            LEFT JOIN users drU ON drU.id = w.driver_user_id
             WHERE 1=1';
     $params = [];
 
@@ -137,10 +140,10 @@ require __DIR__ . '/../includes/header.php';
             <td><?= e($w['destination_title']) ?> <span class="text-muted small">(<?= e($w['destination_region_name']) ?>)</span></td>
             <td class="ltr-text"><?= e(number_format((float)$w['distance_km'], 2)) ?></td>
             <td><span class="product-badge"><?= e($w['product_type']) ?></span></td>
-            <td class="ltr-text text-muted small"><?= e($w['issue_date']) ?></td>
+            <td class="ltr-text text-muted small"><?= e(to_jalali_display($w['issue_date'])) ?></td>
             <td><span class="status-badge <?= e($statusClassMap[$w['send_status']] ?? '') ?>"><?= e($w['send_status']) ?></span></td>
-            <td><?= e($w['operator_first'] . ' ' . $w['operator_last']) ?></td>
-            <td><?= e($w['driver_first'] . ' ' . $w['driver_last']) ?></td>
+            <td><?= $w['operator_first'] ? e($w['operator_first'] . ' ' . $w['operator_last']) : '<span class="text-muted">—</span>' ?></td>
+            <td><?= $w['driver_first'] ? e($w['driver_first'] . ' ' . $w['driver_last']) : '<span class="text-muted">—</span>' ?></td>
             <td class="text-start">
               <div class="d-flex gap-1 justify-content-start">
                 <a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1"

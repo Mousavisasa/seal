@@ -1,19 +1,21 @@
 <?php
 /**
  * ویرایش منطقه
+ * توجه: region_code کلید اصلی جدول است و در جدول locations به آن ارجاع داده شده،
+ * بنابراین در این صفحه فقط قابل نمایش است و تغییر نمی‌کند (فقط نام منطقه ویرایش می‌شود).
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../helpers/auth.php';
 
 require_waybill_access();
 
-$id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+$code = (int)($_GET['code'] ?? $_POST['region_code'] ?? 0);
 $region = null;
 $errors = [];
 
 try {
-    $stmt = db()->prepare('SELECT * FROM regions WHERE id = ? LIMIT 1');
-    $stmt->execute([$id]);
+    $stmt = db()->prepare('SELECT * FROM regions WHERE region_code = ? LIMIT 1');
+    $stmt->execute([$code]);
     $region = $stmt->fetch();
 } catch (PDOException $e) {
     error_log('Region fetch error: ' . $e->getMessage());
@@ -25,35 +27,25 @@ if (!$region) {
     exit;
 }
 
-$old = ['region_code' => $region['region_code'], 'region_name' => $region['region_name']];
+$old = ['region_name' => $region['region_name']];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf()) {
         $errors[] = 'نشست شما منقضی شده است. لطفاً فرم را دوباره ارسال کنید.';
     } else {
-        $old['region_code'] = trim((string)($_POST['region_code'] ?? ''));
         $old['region_name'] = trim((string)($_POST['region_name'] ?? ''));
 
-        if ($old['region_code'] === '' || mb_strlen($old['region_code']) > 20) {
-            $errors[] = 'کد منطقه الزامی است و باید حداکثر ۲۰ کاراکتر باشد.';
-        }
-        if (mb_strlen($old['region_name']) < 2) {
-            $errors[] = 'نام منطقه باید حداقل ۲ حرف باشد.';
+        if (mb_strlen($old['region_name']) < 2 || mb_strlen($old['region_name']) > 100) {
+            $errors[] = 'نام منطقه باید بین ۲ تا ۱۰۰ کاراکتر باشد.';
         }
 
         if (!$errors) {
             try {
-                $stmt = db()->prepare('SELECT id FROM regions WHERE region_code = ? AND id <> ? LIMIT 1');
-                $stmt->execute([$old['region_code'], $region['id']]);
-                if ($stmt->fetch()) {
-                    $errors[] = 'منطقه دیگری با این کد قبلاً ثبت شده است.';
-                } else {
-                    $stmt = db()->prepare('UPDATE regions SET region_code = ?, region_name = ? WHERE id = ?');
-                    $stmt->execute([$old['region_code'], $old['region_name'], $region['id']]);
-                    set_flash('success', 'منطقه با موفقیت ویرایش شد.');
-                    header('Location: ' . BASE_URL . '/regions/list.php');
-                    exit;
-                }
+                $stmt = db()->prepare('UPDATE regions SET region_name = ? WHERE region_code = ?');
+                $stmt->execute([$old['region_name'], $region['region_code']]);
+                set_flash('success', 'منطقه با موفقیت ویرایش شد.');
+                header('Location: ' . BASE_URL . '/regions/list.php');
+                exit;
             } catch (PDOException $e) {
                 error_log('Update region error: ' . $e->getMessage());
                 $errors[] = 'خطایی در ویرایش منطقه رخ داد. لطفاً دوباره تلاش کنید.';
@@ -69,7 +61,7 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="mb-4">
   <h1 class="h4 fw-bold mb-1">ویرایش منطقه</h1>
-  <p class="text-muted small mb-0">اطلاعات منطقه انتخاب‌شده را ویرایش کنید.</p>
+  <p class="text-muted small mb-0">نام منطقه انتخاب‌شده را ویرایش کنید. کد منطقه قابل تغییر نیست.</p>
 </div>
 
 <?php if ($errors): ?>
@@ -87,14 +79,13 @@ require __DIR__ . '/../includes/header.php';
   <div class="card-body p-4">
     <form method="post" action="<?= BASE_URL ?>/regions/edit.php" novalidate>
       <?= csrf_field() ?>
-      <input type="hidden" name="id" value="<?= e((string)$region['id']) ?>">
+      <input type="hidden" name="region_code" value="<?= e((string)$region['region_code']) ?>">
       <div class="row g-3">
         <div class="col-md-6">
-          <label class="form-label" for="region_code">کد منطقه</label>
+          <label class="form-label">کد منطقه</label>
           <div class="input-group">
             <span class="input-group-text"><span class="iconify" data-icon="solar:hashtag-square-bold"></span></span>
-            <input type="text" class="form-control ltr-text" id="region_code" name="region_code" required maxlength="20"
-                   value="<?= e($old['region_code']) ?>">
+            <input type="text" class="form-control ltr-text" value="<?= e((string)$region['region_code']) ?>" disabled>
           </div>
         </div>
         <div class="col-md-6">

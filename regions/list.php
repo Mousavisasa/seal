@@ -1,6 +1,7 @@
 <?php
 /**
  * فهرست مناطق با جستجوی ساده
+ * توجه: region_code خودش کلید اصلی جدول است (طبق ساختار جدید)
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../helpers/auth.php';
@@ -13,12 +14,12 @@ $regions = [];
 try {
     if ($search !== '') {
         $stmt = db()->prepare(
-            'SELECT * FROM regions WHERE region_name LIKE ? OR region_code LIKE ? ORDER BY id DESC'
+            'SELECT * FROM regions WHERE region_name LIKE ? OR region_code LIKE ? ORDER BY region_code ASC'
         );
         $like = '%' . $search . '%';
         $stmt->execute([$like, $like]);
     } else {
-        $stmt = db()->query('SELECT * FROM regions ORDER BY id DESC');
+        $stmt = db()->query('SELECT * FROM regions ORDER BY region_code ASC');
     }
     $regions = $stmt->fetchAll();
 } catch (PDOException $e) {
@@ -49,7 +50,7 @@ require __DIR__ . '/../includes/header.php';
       <label class="form-label" for="q">جستجو در کد یا نام منطقه</label>
       <div class="input-group">
         <span class="input-group-text"><span class="iconify" data-icon="solar:magnifer-bold"></span></span>
-        <input type="text" class="form-control" id="q" name="q" value="<?= e($search) ?>" placeholder="مثلاً تهران یا RG-001">
+        <input type="text" class="form-control" id="q" name="q" value="<?= e($search) ?>" placeholder="مثلاً تهران یا 1">
       </div>
     </div>
     <div class="col-md-4 d-flex gap-2">
@@ -68,23 +69,19 @@ require __DIR__ . '/../includes/header.php';
       <table class="table table-hover align-middle mb-0">
         <thead>
           <tr>
-            <th>#</th>
             <th>کد منطقه</th>
             <th>نام منطقه</th>
-            <th>تاریخ ثبت</th>
             <th class="text-start">عملیات</th>
           </tr>
         </thead>
         <tbody>
           <?php foreach ($regions as $r): ?>
           <tr>
-            <td class="text-muted"><?= e((string)$r['id']) ?></td>
-            <td class="ltr-text fw-bold"><?= e($r['region_code']) ?></td>
+            <td class="ltr-text fw-bold"><?= e((string)$r['region_code']) ?></td>
             <td><?= e($r['region_name']) ?></td>
-            <td class="ltr-text text-muted small"><?= e($r['created_at']) ?></td>
             <td class="text-start">
               <a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1"
-                 href="<?= BASE_URL ?>/regions/edit.php?id=<?= e((string)$r['id']) ?>">
+                 href="<?= BASE_URL ?>/regions/edit.php?code=<?= e((string)$r['region_code']) ?>">
                 <span class="iconify" data-icon="solar:pen-bold"></span> ویرایش
               </a>
             </td>

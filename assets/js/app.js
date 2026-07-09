@@ -278,3 +278,21 @@
     });
   }
 })();
+
+/* ---------- تقویم شمسی برای فیلدهای تاریخ ---------- */
+(function () {
+  'use strict';
+  if (!window.jQuery || !jQuery.fn || !jQuery.fn.persianDatepicker) return;
+
+  jQuery('[data-jalali-datepicker]').each(function () {
+    jQuery(this).persianDatepicker({
+      format: 'YYYY/MM/DD',
+      autoClose: true,
+      initialValue: false,
+      observer: true,
+      toolbox: {
+        calendarSwitch: { enabled: false }
+      }
+    });
+  });
+})();

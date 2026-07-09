@@ -1,6 +1,7 @@
 <?php
 /**
  * ایجاد منطقه جدید
+ * توجه: region_code خودش کلید اصلی است و باید عددی و یکتا باشد
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../helpers/auth.php';
@@ -14,25 +15,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf()) {
         $errors[] = 'نشست شما منقضی شده است. لطفاً فرم را دوباره ارسال کنید.';
     } else {
-        $old['region_code'] = trim((string)($_POST['region_code'] ?? ''));
+        $old['region_code'] = trim(normalize_digits((string)($_POST['region_code'] ?? '')));
         $old['region_name'] = trim((string)($_POST['region_name'] ?? ''));
 
-        if ($old['region_code'] === '' || mb_strlen($old['region_code']) > 20) {
-            $errors[] = 'کد منطقه الزامی است و باید حداکثر ۲۰ کاراکتر باشد.';
+        if ($old['region_code'] === '' || !ctype_digit($old['region_code'])) {
+            $errors[] = 'کد منطقه الزامی است و باید یک عدد صحیح باشد.';
         }
-        if (mb_strlen($old['region_name']) < 2) {
-            $errors[] = 'نام منطقه باید حداقل ۲ حرف باشد.';
+        if (mb_strlen($old['region_name']) < 2 || mb_strlen($old['region_name']) > 100) {
+            $errors[] = 'نام منطقه باید بین ۲ تا ۱۰۰ کاراکتر باشد.';
         }
 
         if (!$errors) {
             try {
-                $stmt = db()->prepare('SELECT id FROM regions WHERE region_code = ? LIMIT 1');
-                $stmt->execute([$old['region_code']]);
+                $stmt = db()->prepare('SELECT region_code FROM regions WHERE region_code = ? LIMIT 1');
+                $stmt->execute([(int)$old['region_code']]);
                 if ($stmt->fetch()) {
                     $errors[] = 'منطقه‌ای با این کد قبلاً ثبت شده است.';
                 } else {
                     $stmt = db()->prepare('INSERT INTO regions (region_code, region_name) VALUES (?, ?)');
-                    $stmt->execute([$old['region_code'], $old['region_name']]);
+                    $stmt->execute([(int)$old['region_code'], $old['region_name']]);
                     set_flash('success', 'منطقه «' . $old['region_name'] . '» با موفقیت ایجاد شد.');
                     header('Location: ' . BASE_URL . '/regions/list.php');
                     exit;
@@ -75,8 +76,9 @@ require __DIR__ . '/../includes/header.php';
           <label class="form-label" for="region_code">کد منطقه</label>
           <div class="input-group">
             <span class="input-group-text"><span class="iconify" data-icon="solar:hashtag-square-bold"></span></span>
-            <input type="text" class="form-control ltr-text" id="region_code" name="region_code" required maxlength="20"
-                   value="<?= e($old['region_code']) ?>" placeholder="مثلاً RG-004">
+            <input type="text" class="form-control ltr-text" id="region_code" name="region_code" required
+                   inputmode="numeric" maxlength="10"
+                   value="<?= e($old['region_code']) ?>" placeholder="مثلاً 38">
           </div>
         </div>
         <div class="col-md-6">
@@ -84,7 +86,7 @@ require __DIR__ . '/../includes/header.php';
           <div class="input-group">
             <span class="input-group-text"><span class="iconify" data-icon="solar:map-point-bold"></span></span>
             <input type="text" class="form-control" id="region_name" name="region_name" required minlength="2"
-                   value="<?= e($old['region_name']) ?>" placeholder="مثلاً منطقه اصفهان">
+                   value="<?= e($old['region_name']) ?>" placeholder="مثلاً اصفهان">
           </div>
         </div>
       </div>

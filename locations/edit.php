@@ -1,6 +1,7 @@
 <?php
 /**
  * ویرایش مبدا/مقصد
+ * locations.region_id به regions.region_code ارجاع دارد
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../helpers/auth.php';
@@ -13,7 +14,7 @@ $errors = [];
 $regions = [];
 
 try {
-    $regions = db()->query('SELECT id, region_code, region_name FROM regions ORDER BY region_name')->fetchAll();
+    $regions = db()->query('SELECT region_code, region_name FROM regions ORDER BY region_name')->fetchAll();
     $stmt = db()->prepare('SELECT * FROM locations WHERE id = ? LIMIT 1');
     $stmt->execute([$id]);
     $location = $stmt->fetch();
@@ -31,7 +32,8 @@ $old = [
     'location_code' => $location['location_code'],
     'region_id'      => (string)$location['region_id'],
     'title'          => $location['title'],
-    'geo_location'   => (string)$location['geo_location'],
+    'lat'            => (string)$location['lat'],
+    'lon'            => (string)$location['lon'],
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -41,10 +43,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $old['location_code'] = trim((string)($_POST['location_code'] ?? ''));
         $old['region_id']     = (string)($_POST['region_id'] ?? '');
         $old['title']         = trim((string)($_POST['title'] ?? ''));
-        $old['geo_location']  = trim((string)($_POST['geo_location'] ?? ''));
+        $old['lat']           = trim((string)($_POST['lat'] ?? ''));
+        $old['lon']           = trim((string)($_POST['lon'] ?? ''));
 
-        if ($old['location_code'] === '' || mb_strlen($old['location_code']) > 20) {
-            $errors[] = 'کد مکان الزامی است و باید حداکثر ۲۰ کاراکتر باشد.';
+        if ($old['location_code'] === '' || mb_strlen($old['location_code']) > 10) {
+            $errors[] = 'کد مکان الزامی است و باید حداکثر ۱۰ کاراکتر باشد.';
         }
         if (mb_strlen($old['title']) < 2) {
             $errors[] = 'عنوان مکان باید حداقل ۲ حرف باشد.';
@@ -53,10 +56,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($regionId <= 0) {
             $errors[] = 'انتخاب منطقه الزامی است.';
         }
+        $lat = $old['lat'] !== '' ? $old['lat'] : '0';
+        $lon = $old['lon'] !== '' ? $old['lon'] : '0';
+        if (!is_numeric($lat) || (float)$lat < -90 || (float)$lat > 90) {
+            $errors[] = 'مقدار عرض جغرافیایی (lat) معتبر نیست.';
+        }
+        if (!is_numeric($lon) || (float)$lon < -180 || (float)$lon > 180) {
+            $errors[] = 'مقدار طول جغرافیایی (lon) معتبر نیست.';
+        }
 
         if (!$errors) {
             try {
-                $stmt = db()->prepare('SELECT id FROM regions WHERE id = ? LIMIT 1');
+                $stmt = db()->prepare('SELECT region_code FROM regions WHERE region_code = ? LIMIT 1');
                 $stmt->execute([$regionId]);
                 if (!$stmt->fetch()) {
                     $errors[] = 'منطقه انتخاب‌شده معتبر نیست.';
@@ -75,13 +86,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $errors[] = 'مکان دیگری با این کد قبلاً ثبت شده است.';
                 } else {
                     $stmt = db()->prepare(
-                        'UPDATE locations SET location_code = ?, region_id = ?, title = ?, geo_location = ? WHERE id = ?'
+                        'UPDATE locations SET location_code = ?, region_id = ?, title = ?, lat = ?, lon = ? WHERE id = ?'
                     );
                     $stmt->execute([
                         $old['location_code'],
                         $regionId,
                         $old['title'],
-                        $old['geo_location'] !== '' ? $old['geo_location'] : null,
+                        (float)$lat,
+                        (float)$lon,
                         $location['id'],
                     ]);
                     set_flash('success', 'مکان با موفقیت ویرایش شد.');
@@ -127,7 +139,7 @@ require __DIR__ . '/../includes/header.php';
           <label class="form-label" for="location_code">کد مکان</label>
           <div class="input-group">
             <span class="input-group-text"><span class="iconify" data-icon="solar:hashtag-square-bold"></span></span>
-            <input type="text" class="form-control ltr-text" id="location_code" name="location_code" required maxlength="20"
+            <input type="text" class="form-control ltr-text" id="location_code" name="location_code" required maxlength="10"
                    value="<?= e($old['location_code']) ?>">
           </div>
         </div>
@@ -138,8 +150,8 @@ require __DIR__ . '/../includes/header.php';
             <select class="form-select" id="region_id" name="region_id" required>
               <option value="">— انتخاب کنید —</option>
               <?php foreach ($regions as $r): ?>
-                <option value="<?= e((string)$r['id']) ?>" <?= (string)$r['id'] === $old['region_id'] ? 'selected' : '' ?>>
-                  <?= e($r['region_name']) ?> (<?= e($r['region_code']) ?>)
+                <option value="<?= e((string)$r['region_code']) ?>" <?= (string)$r['region_code'] === $old['region_id'] ? 'selected' : '' ?>>
+                  <?= e($r['region_name']) ?> (<?= e((string)$r['region_code']) ?>)
                 </option>
               <?php endforeach; ?>
             </select>
@@ -153,12 +165,20 @@ require __DIR__ . '/../includes/header.php';
                    value="<?= e($old['title']) ?>">
           </div>
         </div>
-        <div class="col-md-6">
-          <label class="form-label" for="geo_location">مختصات جغرافیایی (اختیاری)</label>
+        <div class="col-md-3">
+          <label class="form-label" for="lat">عرض جغرافیایی (lat) <span class="text-muted small">(اختیاری)</span></label>
           <div class="input-group">
             <span class="input-group-text"><span class="iconify" data-icon="solar:global-bold"></span></span>
-            <input type="text" class="form-control ltr-text" id="geo_location" name="geo_location"
-                   value="<?= e($old['geo_location']) ?>">
+            <input type="text" class="form-control ltr-text" id="lat" name="lat"
+                   value="<?= e($old['lat']) ?>">
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="lon">طول جغرافیایی (lon) <span class="text-muted small">(اختیاری)</span></label>
+          <div class="input-group">
+            <span class="input-group-text"><span class="iconify" data-icon="solar:global-bold"></span></span>
+            <input type="text" class="form-control ltr-text" id="lon" name="lon"
+                   value="<?= e($old['lon']) ?>">
           </div>
         </div>
       </div>

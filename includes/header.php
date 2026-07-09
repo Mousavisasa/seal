@@ -15,6 +15,7 @@ $active = $active ?? '';
 <title><?= e($page_title) ?> | <?= e(APP_NAME) ?></title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css">
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
 <script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
 </head>
