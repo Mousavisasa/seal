@@ -285,10 +285,15 @@
   if (!window.jQuery || !jQuery.fn || !jQuery.fn.persianDatepicker) return;
 
   jQuery('[data-jalali-datepicker]').each(function () {
-    jQuery(this).persianDatepicker({
+    var $input = jQuery(this);
+    var hasValue = $input.val() && $input.val().trim() !== '';
+
+    $input.persianDatepicker({
       format: 'YYYY/MM/DD',
       autoClose: true,
-      initialValue: false,
+      // اگر فیلد از قبل مقداری دارد (مثلاً تاریخ امروز که توسط سرور پر شده)،
+      // همان مقدار در تقویم هم انتخاب‌شده نمایش داده شود؛ در غیر این صورت خالی بماند.
+      initialValue: hasValue,
       observer: true,
       toolbox: {
         calendarSwitch: { enabled: false }
@@ -330,6 +335,49 @@
   destSel.addEventListener('change', checkRegionMatch);
 })();
 
+/* ---------- جلوگیری از انتخاب مبدا و مقصد یکسان (برای همه کاربران، از جمله ادمین) ---------- */
+(function () {
+  'use strict';
+  var originSel = document.getElementById('origin_location_id');
+  var destSel = document.getElementById('destination_location_id');
+  if (!originSel || !destSel) return;
+
+  var form = originSel.closest('form');
+
+  function checkSameLocation() {
+    var same = originSel.value !== '' && originSel.value === destSel.value;
+    var existingWarning = document.getElementById('sameLocationWarning');
+
+    if (same) {
+      if (!existingWarning) {
+        var div = document.createElement('div');
+        div.id = 'sameLocationWarning';
+        div.className = 'alert alert-danger d-flex align-items-center gap-2 mt-3';
+        div.innerHTML = '<span class="iconify" data-icon="solar:danger-triangle-bold"></span> مبدا و مقصد نمی‌توانند یکسان باشند.';
+        var actionsRow = form.querySelector('.d-flex.gap-2.mt-4');
+        if (actionsRow) {
+          form.insertBefore(div, actionsRow);
+        } else {
+          form.appendChild(div);
+        }
+      }
+    } else if (existingWarning) {
+      existingWarning.remove();
+    }
+  }
+
+  function blockSubmitIfSame(e) {
+    if (originSel.value !== '' && originSel.value === destSel.value) {
+      e.preventDefault();
+      checkSameLocation();
+    }
+  }
+
+  originSel.addEventListener('change', checkSameLocation);
+  destSel.addEventListener('change', checkSameLocation);
+  if (form) form.addEventListener('submit', blockSubmitIfSame);
+})();
+
 /* ---------- نمایش/مخفی‌کردن فیلد منطقه بر اساس نقش کاربر در فرم ایجاد/ویرایش کاربر ---------- */
 (function () {
   'use strict';
@@ -350,3 +398,58 @@
   userTypeSel.addEventListener('change', toggleRegionField);
   toggleRegionField();
 })();
+
+/* ---------- بارگذاری مطمئن ECharts (رفع مشکل نمایش‌نیافتن نمودار بدون رفرش) ---------- */
+/**
+ * بعضی مواقع اسکریپت CDN کتابخانه ECharts کمی دیرتر از اجرای اسکریپت صفحه لود می‌شود،
+ * یا اندازه واقعی ظرف نمودار هنوز توسط مرورگر محاسبه نشده است (به‌خصوص در بارگذاری اول صفحه).
+ * این تابع مطمئن می‌شود که echarts کاملاً آماده است و صفحه رندر نهایی خودش را انجام داده
+ * قبل از این‌که هر نموداری ساخته شود؛ در غیر این صورت چند بار امتحان می‌کند.
+ */
+window.whenEChartsReady = function (callback) {
+  var attempts = 0;
+  var maxAttempts = 50; // حداکثر ۵ ثانیه انتظار (۵۰ × ۱۰۰ میلی‌ثانیه)
+
+  function tryRun() {
+    attempts++;
+    if (typeof echarts !== 'undefined') {
+      // یک فریم دیگر صبر می‌کنیم تا چیدمان (layout) صفحه کامل شود و اندازه واقعی ظرف مشخص باشد
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          callback();
+        });
+      });
+      return;
+    }
+    if (attempts < maxAttempts) {
+      setTimeout(tryRun, 100);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', tryRun);
+  } else {
+    tryRun();
+  }
+};
+
+/* بازرسم خودکار همه نمودارهای صفحه هنگام تغییر اندازه پنجره یا نمایان‌شدن مجدد تب */
+window.addEventListener('resize', function () {
+  if (window.__registeredCharts) {
+    window.__registeredCharts.forEach(function (c) {
+      if (c && typeof c.resize === 'function') {
+        try { c.resize(); } catch (e) { /* نادیده گرفتن خطای نمودار حذف‌شده */ }
+      }
+    });
+  }
+});
+
+document.addEventListener('visibilitychange', function () {
+  if (!document.hidden && window.__registeredCharts) {
+    window.__registeredCharts.forEach(function (c) {
+      if (c && typeof c.resize === 'function') {
+        try { c.resize(); } catch (e) { /* نادیده گرفتن خطای نمودار حذف‌شده */ }
+      }
+    });
+  }
+});

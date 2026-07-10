@@ -28,7 +28,12 @@ $token = trim((string)($_GET['token'] ?? ''));
 if ($token !== '') {
     try {
         $driver = validate_access_token($token, 'driver_waybills');
-        if ((int)($driver['is_active'] ?? 1) === 0) {
+        if (!$driver) {
+            $errors[] = 'توکن نامعتبر است یا منقضی شده است. لطفاً دوباره وارد شوید.';
+        } elseif ($driver['user_type'] !== 'driver') {
+            $driver = null;
+            $errors[] = 'این توکن متعلق به یک حساب راننده نیست.';
+        } elseif ((int)($driver['is_active'] ?? 1) === 0) {
             $driver = null;
             $errors[] = 'حساب کاربری شما غیرفعال شده است. برای اطلاعات بیشتر با مدیر سامانه تماس بگیرید.';
         }
@@ -47,7 +52,7 @@ if (!$driver && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'نام کاربری (کد ملی) و رمز عبور را وارد کنید.';
     } else {
         try {
-            $stmt = db()->prepare("SELECT * FROM users WHERE national_code = ?  LIMIT 1");
+            $stmt = db()->prepare("SELECT * FROM users WHERE national_code = ? AND user_type = 'driver' LIMIT 1");
             $stmt->execute([$submittedUsername]);
             $user = $stmt->fetch();
 
@@ -70,7 +75,7 @@ if (!$driver && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // ---------- فراخوانی خودِ وب‌سرویس api/waybills.php با همان توکن ----------
 $apiStatus = null;
-if ( $token !== '') {
+if ($driver && $token !== '') {
     $apiUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http')
         . '://' . $_SERVER['HTTP_HOST'] . BASE_URL . '/api/waybills.php?token=' . rawurlencode($token);
 
@@ -133,14 +138,18 @@ $statusClassMap = [
     <span class="iconify fs-1 text-jade" data-icon="solar:code-square-bold"></span>
     <h1 class="h4 fw-bold mt-2 mb-1">فهرست بارنامه‌های ثبت‌شده</h1>
     <p class="text-muted small mb-0">
+      <?php if ($driver): ?>
         نتیجه فراخوانی وب‌سرویس <code class="ltr-text">api/waybills.php</code>
         <?php if ($apiStatus !== null): ?>
           — کد پاسخ: <span class="badge role-badge role-driver ltr-text">HTTP <?= e((string)$apiStatus) ?></span>
         <?php endif; ?>
+      <?php else: ?>
         با کد ملی و رمز عبور خود وارد شوید تا فهرست بارنامه‌های «ثبت شده» را از طریق وب‌سرویس ببینید.
+      <?php endif; ?>
     </p>
   </div>
 
+  <?php if (!$driver): ?>
   <div class="card border-0 shadow-sm mb-4" style="border-radius: 1rem;">
     <div class="card-body p-4">
       <form method="post" action="<?= BASE_URL ?>/api_waybills_view.php" novalidate>
@@ -173,7 +182,7 @@ $statusClassMap = [
       </form>
     </div>
   </div>
-<!--  --><?php //endif; ?>
+  <?php endif; ?>
 
   <?php if ($errors): ?>
     <div class="alert alert-danger d-flex align-items-center gap-2">
@@ -186,6 +195,7 @@ $statusClassMap = [
     </div>
   <?php endif; ?>
 
+  <?php if ($driver): ?>
     <div class="card border-0 shadow-sm mb-3" style="border-radius: 1rem;">
       <div class="card-body p-4 d-flex align-items-center gap-3">
         <span class="iconify fs-1 text-purple" data-icon="solar:user-circle-bold-duotone"></span>
@@ -255,11 +265,14 @@ $statusClassMap = [
         </div>
       </div>
     <?php endif; ?>
+  <?php endif; ?>
 
   <div class="text-center text-muted small mt-4">
     <span class="iconify" data-icon="solar:info-circle-bold"></span>
     این صفحه صرفاً نمایش‌دهنده خروجی وب‌سرویس <code class="ltr-text">api/waybills.php</code> است و نیازی به ورود به پنل ندارد.
+    <?php if ($driver): ?>
       توکن استفاده‌شده حداکثر <?= e((string)ACCESS_TOKEN_TTL_MINUTES) ?> دقیقه از زمان صدور معتبر است.
+    <?php endif; ?>
   </div>
 
 </div>

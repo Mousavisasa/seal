@@ -20,7 +20,7 @@ $old = [
     'origin_location_id'      => '',
     'destination_location_id' => '',
     'distance_km'              => '',
-    'product_type'             => '',
+    'product_type'             => 'بنزین',
     'waybill_number'           => '',
     'issue_date_jalali'        => today_jalali(),
 ];
@@ -71,6 +71,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ((int)$old['destination_location_id'] <= 0) {
             $errors[] = 'انتخاب مقصد الزامی است.';
+        }
+        if (
+            (int)$old['origin_location_id'] > 0
+            && (int)$old['destination_location_id'] > 0
+            && (int)$old['origin_location_id'] === (int)$old['destination_location_id']
+        ) {
+            $errors[] = 'مبدا و مقصد نمی‌توانند یکسان باشند.';
         }
 
         $originLocation = null;
