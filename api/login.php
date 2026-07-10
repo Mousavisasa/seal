@@ -67,7 +67,14 @@ try {
     }
 
     // ساخت توکن موقت (حداکثر ۱۰ دقیقه اعتبار) برای استفاده در صفحاتی مثل driver_waybills.php
-    $token = create_access_token((int)$user['id'], 'driver_waybills');
+    // این بخش جدا از احراز هویت اصلی مدیریت می‌شود: اگر جدول access_tokens هنوز
+    // روی سرور ساخته نشده باشد، ورود کاربر همچنان موفق است، فقط توکن در پاسخ نمی‌آید.
+    $token = null;
+    try {
+        $token = create_access_token((int)$user['id'], 'driver_waybills');
+    } catch (PDOException $e) {
+        error_log('Access token creation failed (is the access_tokens table created? run database.sql): ' . $e->getMessage());
+    }
 
     // حذف هش رمز از خروجی
     unset($user['password']);
