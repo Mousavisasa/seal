@@ -49,16 +49,23 @@ function create_access_token(int $userId, string $purpose = 'driver_waybills'): 
     ensure_access_tokens_table();
 
     $token = bin2hex(random_bytes(32)); // 64 کاراکتر هگزادسیمال
-    $expiresAt = date('Y-m-d H:i:s', time() + (ACCESS_TOKEN_TTL_MINUTES * 60));
 
+    // نکته مهم: زمان انقضا با NOW() خود MySQL محاسبه می‌شود، نه با تابع date() در PHP.
+    // اگر ساعت/منطقه‌زمانی سرور PHP با MySQL یکی نباشد، محاسبه با date() می‌تواند
+    // مقداری بسازد که از دید MySQL از قبل «گذشته» به‌حساب بیاید و توکن بلافاصله
+    // توسط پاکسازی زیر حذف شود. استفاده از NOW() + INTERVAL این ناهماهنگی را حذف می‌کند.
     $stmt = db()->prepare(
-        'INSERT INTO access_tokens (token, user_id, purpose, expires_at) VALUES (?, ?, ?, ?)'
+        'INSERT INTO access_tokens (token, user_id, purpose, expires_at)
+         VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE))'
     );
-    $stmt->execute([$token, $userId, $purpose, $expiresAt]);
+    $stmt->execute([$token, $userId, $purpose, ACCESS_TOKEN_TTL_MINUTES]);
 
-    // پاکسازی فرصت‌طلبانه توکن‌های منقضی‌شده قدیمی (بدون نیاز به کرون جاب جداگانه)
+    // پاکسازی فرصت‌طلبانه توکن‌های واقعاً منقضی‌شده قدیمی (بدون نیاز به کرون جاب جداگانه)
+    // توکنی که همین الان ساختیم را عمداً از این پاکسازی مستثنی می‌کنیم تا در هیچ
+    // شرایطی (حتی اختلاف ساعت جزئی) بلافاصله بعد از ساخت حذف نشود.
     try {
-        db()->exec("DELETE FROM access_tokens WHERE expires_at < NOW()");
+        $cleanupStmt = db()->prepare("DELETE FROM access_tokens WHERE expires_at < NOW() AND token <> ?");
+        $cleanupStmt->execute([$token]);
     } catch (PDOException $e) {
         error_log('Access token cleanup error: ' . $e->getMessage());
     }
