@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>اتصال به بلوتوث از مرورگر</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: Tahoma, "Segoe UI", Arial, sans-serif;
+    max-width: 520px;
+    margin: 40px auto;
+    padding: 20px;
+    background: #f5f6fa;
+    color: #222;
+    line-height: 1.6;
+  }
+  h2 { text-align: center; margin-bottom: 4px; }
+  p.sub { text-align: center; color: #666; font-size: 13px; margin-top: 0; }
+
+  .warning {
+    background: #fff3cd;
+    border: 1px solid #ffe08a;
+    color: #7a5b00;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+
+  .card {
+    background: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    margin-bottom: 16px;
+  }
+
+  label { display: block; margin-top: 14px; font-weight: bold; font-size: 14px; }
+  input, textarea {
+    width: 100%;
+    padding: 8px;
+    margin-top: 4px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-family: inherit;
+    direction: ltr;
+    text-align: left;
+  }
+  textarea { direction: rtl; text-align: right; }
+
+  .status {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-inline-start: 8px;
+  }
+  .status.disconnected { background: #f5d5d5; color: #a12a2a; }
+  .status.connected { background: #d6f0da; color: #1c7c34; }
+
+  .buttons { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+  button {
+    flex: 1;
+    min-width: 100px;
+    padding: 10px;
+    cursor: pointer;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  #btnConnect { background: #2d6cdf; color: #fff; }
+  #btnSend { background: #1c9c5b; color: #fff; }
+  #btnDisconnect { background: #c0392b; color: #fff; }
+
+  .log {
+    margin-top: 14px;
+    padding: 10px;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    border-radius: 8px;
+    font-family: "Consolas", monospace;
+    font-size: 12px;
+    height: 140px;
+    overflow-y: auto;
+    direction: ltr;
+    text-align: left;
+    white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+
+<h2>📶 اتصال به بلوتوث از مرورگر</h2>
+<p class="sub">بدون سرور، بدون نصب — فقط Web Bluetooth API</p>
+
+<div id="warning" class="warning" style="display:none;"></div>
+
+<div class="card">
+  <div>
+    وضعیت:
+    <span id="statusBadge" class="status disconnected">متصل نیست</span>
+  </div>
+
+  <label>UUID سرویس (Service UUID)</label>
+  <input type="text" id="serviceUuid" value="6e400001-b5a3-f393-e0a9-e50e24dcca9e">
+
+  <label>UUID کاراکتریستیک نوشتن (Write Characteristic UUID)</label>
+  <input type="text" id="charUuid" value="6e400002-b5a3-f393-e0a9-e50e24dcca9e">
+
+  <label>متن پیام</label>
+  <textarea id="message" rows="3">سلام، این یک پیام آزمایشی است.</textarea>
+
+  <div class="buttons">
+    <button id="btnConnect">جستجو و اتصال</button>
+    <button id="btnSend" disabled>ارسال پیام</button>
+    <button id="btnDisconnect" disabled>قطع اتصال</button>
+  </div>
+
+  <div id="log" class="log"></div>
+</div>
+
+<script>
+let device = null;
+let characteristic = null;
+
+const logEl = document.getElementById('log');
+const statusBadge = document.getElementById('statusBadge');
+const btnConnect = document.getElementById('btnConnect');
+const btnSend = document.getElementById('btnSend');
+const btnDisconnect = document.getElementById('btnDisconnect');
+const warningEl = document.getElementById('warning');
+
+function log(msg) {
+  const time = new Date().toLocaleTimeString('en-GB');
+  logEl.textContent += `[${time}] ${msg}\n`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function setConnected(isConnected) {
+  statusBadge.textContent = isConnected ? 'متصل' : 'متصل نیست';
+  statusBadge.className = 'status ' + (isConnected ? 'connected' : 'disconnected');
+  btnSend.disabled = !isConnected;
+  btnDisconnect.disabled = !isConnected;
+  btnConnect.disabled = isConnected;
+}
+
+// بررسی پشتیبانی مرورگر از Web Bluetooth
+if (!navigator.bluetooth) {
+  warningEl.style.display = 'block';
+  warningEl.textContent =
+    'مرورگر فعلی از Web Bluetooth API پشتیبانی نمی‌کند. از Chrome یا Edge (نسخه دسکتاپ یا اندروید) روی یک آدرس https یا localhost استفاده کنید.';
+  btnConnect.disabled = true;
+}
+
+btnConnect.addEventListener('click', async () => {
+  const serviceUuid = document.getElementById('serviceUuid').value.trim();
+  const charUuid = document.getElementById('charUuid').value.trim();
+
+  if (!serviceUuid || !charUuid) {
+    log('لطفاً UUID سرویس و کاراکتریستیک را وارد کنید.');
+    return;
+  }
+
+  try {
+    log('در حال باز کردن پنجره‌ی انتخاب دستگاه...');
+    device = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: [serviceUuid]
+    });
+
+    log(`دستگاه انتخاب شد: ${device.name || '(بدون نام)'}`);
+    device.addEventListener('gattserverdisconnected', onDisconnected);
+
+    log('در حال اتصال به GATT سرور...');
+    const server = await device.gatt.connect();
+
+    log('در حال دریافت سرویس...');
+    const service = await server.getPrimaryService(serviceUuid);
+
+    log('در حال دریافت کاراکتریستیک...');
+    characteristic = await service.getCharacteristic(charUuid);
+
+    log('اتصال با موفقیت برقرار شد. آماده‌ی ارسال.');
+    setConnected(true);
+  } catch (err) {
+    log('خطا: ' + err.message);
+    setConnected(false);
+  }
+});
+
+btnSend.addEventListener('click', async () => {
+  const text = document.getElementById('message').value;
+  if (!characteristic) {
+    log('ابتدا باید متصل شوید.');
+    return;
+  }
+  try {
+    const data = new TextEncoder().encode(text);
+    await characteristic.writeValue(data);
+    log(`متن ارسال شد: "${text}"`);
+  } catch (err) {
+    log('خطا در ارسال: ' + err.message);
+  }
+});
+
+btnDisconnect.addEventListener('click', () => {
+  if (device && device.gatt.connected) {
+    device.gatt.disconnect();
+  }
+});
+
+function onDisconnected() {
+  log('اتصال قطع شد.');
+  characteristic = null;
+  setConnected(false);
+}
+</script>
+
+</body>
+</html>
