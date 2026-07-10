@@ -311,3 +311,74 @@ body { background: var(--surface); color: var(--ink); }
 }
 
 .filter-bar { background: #fff; border-radius: var(--card-radius); box-shadow: var(--soft-shadow); padding: 1rem 1.25rem; }
+
+/* ---------- صفحه عمومی مشاهده بارنامه راننده ---------- */
+.public-page-body {
+  min-height: 100vh;
+  padding: 1.25rem 1rem 2.5rem;
+  background:
+    radial-gradient(60rem 60rem at 110% -10%, rgba(112, 72, 200, .18), transparent 60%),
+    radial-gradient(50rem 50rem at -10% 110%, rgba(13, 166, 120, .20), transparent 60%),
+    var(--surface);
+}
+.public-page-wrap { max-width: 980px; margin: 0 auto; }
+
+.waybill-card {
+  background: #fff;
+  border-radius: 1.1rem;
+  box-shadow: var(--soft-shadow);
+  padding: 1.1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: .65rem;
+  height: 100%;
+}
+.waybill-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .5rem;
+}
+.waybill-card-number {
+  font-weight: 800;
+  font-size: 1.05rem;
+  direction: ltr;
+  text-align: right;
+}
+.waybill-card-route {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  background: var(--surface);
+  border-radius: .7rem;
+  padding: .6rem .75rem;
+  font-size: .88rem;
+}
+.waybill-card-route .iconify { flex-shrink: 0; color: var(--jade-dark); }
+.waybill-card-route-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.waybill-card-route-arrow { color: var(--dim); flex-shrink: 0; }
+
+.waybill-card-meta {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: .5rem .75rem;
+  font-size: .82rem;
+}
+.waybill-card-meta-item { display: flex; align-items: center; gap: .4rem; color: var(--ink); }
+.waybill-card-meta-item .iconify { color: var(--dim); font-size: 1rem; flex-shrink: 0; }
+.waybill-card-meta-label { color: var(--dim); flex-shrink: 0; }
+.waybill-card-meta-value { font-weight: 600; overflow-wrap: anywhere; }
+
+.waybill-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  margin-top: auto;
+  padding-top: .5rem;
+  border-top: 1px solid #f0f3f2;
+}
+
+@media (max-width: 575.98px) {
+  .waybill-card-meta { grid-template-columns: 1fr; }
+}

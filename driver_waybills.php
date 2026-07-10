@@ -112,9 +112,9 @@ $statusClassMap = [
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
 <script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
 </head>
-<body class="auth-body">
+<body class="public-page-body">
 
-<div class="w-100" style="max-width: 980px;">
+<div class="public-page-wrap">
 
   <div class="text-center mb-4">
     <span class="iconify fs-1 text-jade" data-icon="solar:bus-bold-duotone"></span>
@@ -188,47 +188,74 @@ $statusClassMap = [
       </div>
     </div>
 
-    <div class="card border-0 shadow-sm" style="border-radius: 1rem;">
-      <div class="card-body p-0">
-        <?php if ($waybills): ?>
-        <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
-            <thead>
-              <tr>
-                <th>شماره بارنامه</th>
-                <th>مبدا</th>
-                <th>مقصد</th>
-                <th>فرآورده</th>
-                <th>مسافت</th>
-                <th>تاریخ صدور</th>
-                <th>وضعیت</th>
-                <th>پلمپ</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php foreach ($waybills as $w): ?>
-              <tr>
-                <td class="ltr-text fw-bold"><?= e($w['waybill_number']) ?></td>
-                <td><?= e($w['origin_title']) ?></td>
-                <td><?= e($w['destination_title']) ?></td>
-                <td><span class="product-badge <?= e(product_badge_class($w['product_type'])) ?>"><?= e($w['product_type']) ?></span></td>
-                <td class="ltr-text"><?= e(number_format((float)$w['distance_km'], 0)) ?> کیلومتر</td>
-                <td class="ltr-text text-muted small"><?= e(to_jalali_display($w['issue_date'])) ?></td>
-                <td><span class="status-badge <?= e($statusClassMap[$w['send_status']] ?? '') ?>"><?= e($w['send_status']) ?></span></td>
-                <td class="ltr-text"><?= $w['attached_seal_id'] ? e($w['attached_seal_id']) : '<span class="text-muted">—</span>' ?></td>
-              </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-        </div>
-        <?php else: ?>
-          <div class="text-center text-muted p-5">
-            <span class="iconify fs-1 d-block mb-2" data-icon="solar:fuel-line-duotone"></span>
-            در حال حاضر هیچ بارنامه‌ای با وضعیت «ثبت شده» یا «ارسال شده» برای شما ثبت نشده است.
+    <?php if ($waybills): ?>
+    <div class="row g-3">
+      <?php foreach ($waybills as $w): ?>
+      <div class="col-12 col-md-6">
+        <div class="waybill-card">
+          <div class="waybill-card-head">
+            <span class="waybill-card-number"><?= e($w['waybill_number']) ?></span>
+            <span class="status-badge <?= e($statusClassMap[$w['send_status']] ?? '') ?>"><?= e($w['send_status']) ?></span>
           </div>
-        <?php endif; ?>
+
+          <div class="waybill-card-route">
+            <span class="iconify" data-icon="solar:point-on-map-bold"></span>
+            <span class="waybill-card-route-text"><?= e($w['origin_title']) ?></span>
+            <span class="iconify waybill-card-route-arrow" data-icon="solar:arrow-left-bold"></span>
+            <span class="waybill-card-route-text"><?= e($w['destination_title']) ?></span>
+          </div>
+
+          <div class="waybill-card-meta">
+            <div class="waybill-card-meta-item">
+              <span class="iconify" data-icon="solar:fuel-bold"></span>
+              <span class="waybill-card-meta-label">فرآورده:</span>
+              <span class="product-badge <?= e(product_badge_class($w['product_type'])) ?>"><?= e($w['product_type']) ?></span>
+            </div>
+            <div class="waybill-card-meta-item">
+              <span class="iconify" data-icon="solar:ruler-bold"></span>
+              <span class="waybill-card-meta-label">مسافت:</span>
+              <span class="waybill-card-meta-value ltr-text"><?= e(number_format((float)$w['distance_km'], 0)) ?> کیلومتر</span>
+            </div>
+            <div class="waybill-card-meta-item">
+              <span class="iconify" data-icon="solar:calendar-bold"></span>
+              <span class="waybill-card-meta-label">تاریخ صدور:</span>
+              <span class="waybill-card-meta-value ltr-text"><?= e(to_jalali_display($w['issue_date'])) ?></span>
+            </div>
+            <div class="waybill-card-meta-item">
+              <span class="iconify" data-icon="solar:shield-keyhole-bold"></span>
+              <span class="waybill-card-meta-label">پلمپ:</span>
+              <span class="waybill-card-meta-value ltr-text"><?= $w['attached_seal_id'] ? e($w['attached_seal_id']) : '—' ?></span>
+            </div>
+          </div>
+
+          <?php if ($w['origin_operator_first'] || $w['dest_operator_first']): ?>
+          <div class="waybill-card-footer">
+            <?php if ($w['origin_operator_first']): ?>
+              <span class="text-muted small d-flex align-items-center gap-1">
+                <span class="iconify" data-icon="solar:user-id-bold"></span>
+                متصدی مبدا: <?= e($w['origin_operator_first'] . ' ' . $w['origin_operator_last']) ?>
+              </span>
+            <?php endif; ?>
+            <?php if ($w['dest_operator_first']): ?>
+              <span class="text-muted small d-flex align-items-center gap-1">
+                <span class="iconify" data-icon="solar:user-id-bold"></span>
+                متصدی مقصد: <?= e($w['dest_operator_first'] . ' ' . $w['dest_operator_last']) ?>
+              </span>
+            <?php endif; ?>
+          </div>
+          <?php endif; ?>
+        </div>
       </div>
+      <?php endforeach; ?>
     </div>
+    <?php else: ?>
+      <div class="card border-0 shadow-sm" style="border-radius: 1rem;">
+        <div class="text-center text-muted p-5">
+          <span class="iconify fs-1 d-block mb-2" data-icon="solar:fuel-line-duotone"></span>
+          در حال حاضر هیچ بارنامه‌ای با وضعیت «ثبت شده» یا «ارسال شده» برای شما ثبت نشده است.
+        </div>
+      </div>
+    <?php endif; ?>
   <?php endif; ?>
 
   <div class="text-center text-muted small mt-4">
