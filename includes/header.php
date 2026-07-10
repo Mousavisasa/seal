@@ -50,12 +50,13 @@ $active = $active ?? '';
     </div>
 
     <ul class="sidebar-nav">
-      <?php if (is_admin()): ?>
       <li>
-        <a href="<?= BASE_URL ?>/dashboard.php" class="<?= $active === 'dashboard' ? 'active' : '' ?>">
+        <a href="<?= BASE_URL ?>/<?= e(redirect_path_for_role($_SESSION['user_type'] ?? '')) ?>" class="<?= $active === 'dashboard' ? 'active' : '' ?>">
           <span class="iconify" data-icon="solar:widget-5-bold"></span> داشبورد
         </a>
       </li>
+
+      <?php if (is_admin()): ?>
       <li>
         <a href="<?= BASE_URL ?>/users/list.php" class="<?= $active === 'users-list' ? 'active' : '' ?>">
           <span class="iconify" data-icon="solar:users-group-rounded-bold"></span> فهرست کاربران

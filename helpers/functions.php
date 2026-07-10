@@ -127,3 +127,15 @@ function is_positive_number($value): bool
 {
     return is_numeric($value) && (float)$value > 0;
 }
+
+/** کلاس CSS نشان رنگی نوع فرآورده */
+function product_badge_class(string $productType): string
+{
+    return 'product-badge-' . $productType;
+}
+
+/** رنگ اختصاصی نوع فرآورده (برای استفاده در نمودارها) */
+function product_color(string $productType): string
+{
+    return PRODUCT_COLORS[$productType] ?? '#c7ccd1';
+}

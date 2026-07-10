@@ -91,7 +91,7 @@ require __DIR__ . '/../includes/header.php';
                 <span class="badge role-badge role-region"><?= e($role) ?></span>
               <?php endforeach; ?>
             </td>
-            <td><span class="product-badge"><?= e($w['product_type']) ?></span></td>
+            <td><span class="product-badge <?= e(product_badge_class($w['product_type'])) ?>"><?= e($w['product_type']) ?></span></td>
             <td class="ltr-text text-muted small"><?= e(to_jalali_display($w['issue_date'])) ?></td>
             <td><span class="status-badge <?= e($statusClassMap[$w['send_status']] ?? '') ?>"><?= e($w['send_status']) ?></span></td>
             <td><?= $w['driver_first'] ? e($w['driver_first'] . ' ' . $w['driver_last']) : '<span class="text-muted">تخصیص‌نیافته</span>' ?></td>

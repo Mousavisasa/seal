@@ -153,7 +153,7 @@ require __DIR__ . '/../includes/header.php';
             <td><?= e($w['origin_title']) ?> <span class="text-muted small">(<?= e($w['origin_region_name']) ?>)</span></td>
             <td><?= e($w['destination_title']) ?> <span class="text-muted small">(<?= e($w['destination_region_name']) ?>)</span></td>
             <td class="ltr-text"><?= e(number_format((float)$w['distance_km'], 2)) ?></td>
-            <td><span class="product-badge"><?= e($w['product_type']) ?></span></td>
+            <td><span class="product-badge <?= e(product_badge_class($w['product_type'])) ?>"><?= e($w['product_type']) ?></span></td>
             <td class="ltr-text text-muted small"><?= e(to_jalali_display($w['issue_date'])) ?></td>
             <td><span class="status-badge <?= e($statusClassMap[$w['send_status']] ?? '') ?>"><?= e($w['send_status']) ?></span></td>
             <td class="ltr-text"><?= $w['attached_seal_id'] ? e($w['attached_seal_id']) : '<span class="text-muted">—</span>' ?></td>

@@ -77,13 +77,13 @@ function redirect_path_for_role(string $userType): string
 {
     switch ($userType) {
         case 'driver':
-            return 'waybills/my_trips.php';
+            return 'dashboard_driver.php';
         case 'operator':
-            return 'waybills/my_waybills.php';
+            return 'dashboard_operator.php';
         case 'region':
-            return 'waybills/list.php';
+            return 'dashboard_region.php';
         default:
-            return 'dashboard.php';
+            return 'dashboard_admin.php';
     }
 }
 
