@@ -434,6 +434,13 @@ body { background: var(--surface); color: var(--ink); }
   border-top: 1px dashed #e6ebe9;
 }
 
+.waybill-card-actions {
+  display: flex;
+  gap: .5rem;
+  padding-top: .25rem;
+}
+.waybill-card-actions form { display: flex; flex: 1; }
+
 @media (max-width: 575.98px) {
   .waybill-card { padding: 1.1rem 1.1rem 1.1rem 1.1rem; padding-inline-start: 1.35rem; border-radius: 1rem; }
   .waybill-card-meta { grid-template-columns: 1fr; }

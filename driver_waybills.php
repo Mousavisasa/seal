@@ -1,15 +1,20 @@
 <?php
 /**
- * صفحه عمومی مشاهده بارنامه‌های راننده (بدون نیاز به سشن/ورود به پنل)
+ * صفحه عمومی مشاهده و مدیریت بارنامه‌های راننده (بدون نیاز به سشن/ورود به پنل)
  *
- * دو روش استفاده:
+ * دو روش ورود:
  * ۱) با توکن: driver_waybills.php?token=...
- *    توکن از طریق وب‌سرویس ورود (api/login.php) گرفته می‌شود و حداکثر
- *    ۱۰ دقیقه اعتبار دارد. این روش رمز عبور را در URL قرار نمی‌دهد.
- * ۲) با فرم: اگر توکن ارسال نشود یا نامعتبر/منقضی باشد، فرم ساده کد ملی
- *    و رمز عبور نمایش داده می‌شود (برای استفاده مستقیم در مرورگر).
+ *    توکن از طریق وب‌سرویس ورود (api/login.php) گرفته می‌شود و حداکثر ۱۰ دقیقه اعتبار دارد.
+ * ۲) با فرم کد ملی/رمز عبور: بعد از احراز هویت موفق، یک توکن تازه ساخته می‌شود
+ *    و کاربر به همان صفحه با آدرس ?token=... هدایت می‌شود (redirect)، تا از این به بعد
+ *    همه چیز — از جمله دکمه‌های شروع/پایان سفر — روی همان توکن کار کند، نه رمز عبور.
  *
- * در هر دو حالت فقط بارنامه‌های با وضعیت «ثبت شده» و «ارسال شده» نمایش داده می‌شود.
+ * دقیقاً مانند waybills/my_trips.php:
+ * - فقط بارنامه‌های «ثبت شده» و «ارسال شده» نمایش داده می‌شود (به‌علاوه بارنامه‌ای که
+ *   با «پایان سفر» به «تحویل شده» تبدیل شده، تا کاربر نتیجه عملش را ببیند)
+ * - دکمه «شروع سفر» فقط برای بارنامه با وضعیت «ثبت شده» نمایش داده می‌شود
+ * - دکمه «پایان سفر» فقط برای بارنامه با وضعیت «ارسال شده» نمایش داده می‌شود
+ * - هر عملیات، مالکیت بارنامه (driver_user_id) را دوباره از دیتابیس بررسی می‌کند
  */
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/helpers/functions.php';
@@ -20,22 +25,85 @@ $errors = [];
 $driver = null;
 $waybills = [];
 $submittedUsername = '';
-$viaToken = false;
+$token = trim((string)($_GET['token'] ?? ''));
 
-// ---------- روش ۱: ورود با توکن (GET) ----------
-$tokenParam = trim((string)($_GET['token'] ?? ''));
-if ($tokenParam !== '') {
-    $viaToken = true;
+/** بازگرداندن راننده معتبر از توکن، یا null در صورت نامعتبر/غیرمجازبودن */
+function resolve_driver_from_token(string $token): array
+{
+    $driver = validate_access_token($token, 'driver_waybills');
+    if (!$driver) {
+        return [null, 'توکن نامعتبر است یا منقضی شده است. لطفاً دوباره وارد شوید.'];
+    }
+    if ($driver['user_type'] !== 'driver') {
+        return [null, 'این توکن متعلق به یک حساب راننده نیست.'];
+    }
+    if ((int)($driver['is_active'] ?? 1) === 0) {
+        return [null, 'حساب کاربری شما غیرفعال شده است. برای اطلاعات بیشتر با مدیر سامانه تماس بگیرید.'];
+    }
+    return [$driver, null];
+}
+
+// ---------- عملیات شروع/پایان سفر (POST همراه با توکن) ----------
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['action'] ?? '', ['start_trip', 'end_trip'], true)) {
+    $actionToken = trim((string)($_POST['token'] ?? ''));
+    $waybillId = (int)($_POST['id'] ?? 0);
+    $action = (string)$_POST['action'];
+    $actingDriver = null;
+
     try {
-        $driver = validate_access_token($tokenParam, 'driver_waybills');
-        if (!$driver) {
-            $errors[] = 'توکن نامعتبر است یا منقضی شده است. لطفاً دوباره وارد شوید.';
-        } elseif ($driver['user_type'] !== 'driver') {
-            $driver = null;
-            $errors[] = 'این توکن متعلق به یک حساب راننده نیست.';
-        } elseif ((int)($driver['is_active'] ?? 1) === 0) {
-            $driver = null;
-            $errors[] = 'حساب کاربری شما غیرفعال شده است. برای اطلاعات بیشتر با مدیر سامانه تماس بگیرید.';
+        [$actingDriver, $tokenError] = resolve_driver_from_token($actionToken);
+        if (!$actingDriver) {
+            $errors[] = $tokenError;
+        } elseif ($waybillId <= 0) {
+            $errors[] = 'درخواست نامعتبر است.';
+        } else {
+            $stmt = db()->prepare('SELECT * FROM fuel_waybills WHERE id = ? LIMIT 1');
+            $stmt->execute([$waybillId]);
+            $target = $stmt->fetch();
+
+            if (!$target) {
+                $errors[] = 'بارنامه مورد نظر یافت نشد.';
+            } elseif ((int)$target['driver_user_id'] !== (int)$actingDriver['id']) {
+                $errors[] = 'این بارنامه به شما تخصیص داده نشده است.';
+            } elseif ($action === 'start_trip') {
+                if ($target['send_status'] !== 'ثبت شده') {
+                    $errors[] = 'این بارنامه قبلاً شروع شده یا در وضعیت دیگری قرار دارد.';
+                } else {
+                    $upd = db()->prepare("UPDATE fuel_waybills SET send_status = 'ارسال شده', trip_started_at = NOW() WHERE id = ?");
+                    $upd->execute([$waybillId]);
+                }
+            } elseif ($action === 'end_trip') {
+                if ($target['send_status'] !== 'ارسال شده') {
+                    $errors[] = 'این بارنامه هنوز شروع نشده یا قبلاً تحویل داده شده است.';
+                } else {
+                    $upd = db()->prepare("UPDATE fuel_waybills SET send_status = 'تحویل شده', trip_ended_at = NOW() WHERE id = ?");
+                    $upd->execute([$waybillId]);
+                }
+            }
+        }
+    } catch (PDOException $e) {
+        error_log('Driver waybills trip action error: ' . $e->getMessage());
+        $errors[] = 'خطایی در ثبت عملیات رخ داد. لطفاً دوباره تلاش کنید.';
+    }
+
+    // بازگشت به همان صفحه با همان توکن (Post/Redirect/Get) تا رفرش صفحه دوباره فرم ارسال نکند
+    if (!$errors) {
+        header('Location: ' . BASE_URL . '/driver_waybills.php?token=' . rawurlencode($actionToken));
+        exit;
+    }
+    // در صورت خطا، به‌جای اعتبارسنجی دوباره توکن، همان نتیجه را مستقیم استفاده می‌کنیم
+    $token = $actionToken;
+    if ($actingDriver) {
+        $driver = $actingDriver;
+    }
+}
+
+// ---------- روش ۱: ورود با توکن (GET یا نتیجه اقدام بالا) ----------
+if (!$driver && $token !== '') {
+    try {
+        [$driver, $tokenError] = resolve_driver_from_token($token);
+        if (!$driver && $tokenError && !in_array($tokenError, $errors, true)) {
+            $errors[] = $tokenError;
         }
     } catch (PDOException $e) {
         error_log('Driver waybills token validate error: ' . $e->getMessage());
@@ -43,8 +111,8 @@ if ($tokenParam !== '') {
     }
 }
 
-// ---------- روش ۲: ورود مستقیم با فرم (POST) ----------
-if (!$viaToken && $_SERVER['REQUEST_METHOD'] === 'POST') {
+// ---------- روش ۲: ورود مستقیم با فرم کد ملی/رمز عبور (POST) ----------
+if (!$driver && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === '') {
     $submittedUsername = normalize_digits((string)($_POST['username'] ?? ''));
     $password = (string)($_POST['password'] ?? '');
 
@@ -61,8 +129,11 @@ if (!$viaToken && $_SERVER['REQUEST_METHOD'] === 'POST') {
             } elseif ((int)($user['is_active'] ?? 1) === 0) {
                 $errors[] = 'حساب کاربری شما غیرفعال شده است. برای اطلاعات بیشتر با مدیر سامانه تماس بگیرید.';
             } else {
-                unset($user['password']);
-                $driver = $user;
+                // ورود موفق: یک توکن تازه می‌سازیم و به همان آدرس با توکن هدایت می‌کنیم
+                // تا رمز عبور دیگر در هیچ درخواست بعدی (از جمله شروع/پایان سفر) لازم نباشد
+                $newToken = create_access_token((int)$user['id'], 'driver_waybills');
+                header('Location: ' . BASE_URL . '/driver_waybills.php?token=' . rawurlencode($newToken));
+                exit;
             }
         } catch (PDOException $e) {
             error_log('Driver waybills lookup auth error: ' . $e->getMessage());
@@ -71,7 +142,7 @@ if (!$viaToken && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// ---------- دریافت بارنامه‌ها در صورت احراز هویت موفق (هر دو روش) ----------
+// ---------- دریافت بارنامه‌ها در صورت احراز هویت موفق ----------
 if ($driver) {
     try {
         $stmt = db()->prepare(
@@ -85,7 +156,7 @@ if ($driver) {
              LEFT JOIN users opOrig ON opOrig.id = w.origin_operator_user_id
              LEFT JOIN users opDest ON opDest.id = w.destination_operator_user_id
              LEFT JOIN seals sl ON sl.fuel_waybill_id = w.id
-             WHERE w.driver_user_id = ? AND w.send_status IN ('ثبت شده', 'ارسال شده')
+             WHERE w.driver_user_id = ? AND w.send_status IN ('ثبت شده', 'ارسال شده', 'تحویل شده')
              ORDER BY w.id DESC"
         );
         $stmt->execute([$driver['id']]);
@@ -99,6 +170,7 @@ if ($driver) {
 $statusClassMap = [
     'ثبت شده'   => 'status-registered',
     'ارسال شده' => 'status-sent',
+    'تحویل شده' => 'status-delivered',
 ];
 ?>
 <!DOCTYPE html>
@@ -106,7 +178,7 @@ $statusClassMap = [
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>مشاهده بارنامه‌های راننده | <?= e(APP_NAME) ?></title>
+<title>بارنامه‌های راننده | <?= e(APP_NAME) ?></title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
@@ -118,10 +190,10 @@ $statusClassMap = [
 
   <div class="text-center mb-4">
     <span class="iconify fs-1 text-jade" data-icon="solar:bus-bold-duotone"></span>
-    <h1 class="h4 fw-bold mt-2 mb-1">مشاهده بارنامه‌های راننده</h1>
+    <h1 class="h4 fw-bold mt-2 mb-1">بارنامه‌های راننده</h1>
     <p class="text-muted small mb-0">
-      <?php if ($viaToken && $driver): ?>
-        ورود با توکن موقت انجام شد.
+      <?php if ($driver): ?>
+        سفرهای در جریان خود را مشاهده و مدیریت کنید.
       <?php else: ?>
         با کد ملی و رمز عبور خود وارد شوید تا بارنامه‌های در جریان خود را ببینید.
       <?php endif; ?>
@@ -183,7 +255,7 @@ $statusClassMap = [
           <div class="text-muted small ltr-text"><?= e($driver['national_code']) ?></div>
         </div>
         <div class="ms-auto text-muted small">
-          تعداد بارنامه در جریان: <span class="fw-bold"><?= e((string)count($waybills)) ?></span>
+          تعداد بارنامه: <span class="fw-bold"><?= e((string)count($waybills)) ?></span>
         </div>
       </div>
     </div>
@@ -248,6 +320,32 @@ $statusClassMap = [
             <?php endif; ?>
           </div>
           <?php endif; ?>
+
+          <div class="waybill-card-actions">
+            <?php if ($w['send_status'] === 'ثبت شده'): ?>
+              <form method="post" action="<?= BASE_URL ?>/driver_waybills.php" class="flex-fill">
+                <input type="hidden" name="token" value="<?= e($token) ?>">
+                <input type="hidden" name="id" value="<?= e((string)$w['id']) ?>">
+                <input type="hidden" name="action" value="start_trip">
+                <button type="submit" class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
+                  <span class="iconify" data-icon="solar:play-circle-bold"></span> شروع سفر
+                </button>
+              </form>
+            <?php elseif ($w['send_status'] === 'ارسال شده'): ?>
+              <form method="post" action="<?= BASE_URL ?>/driver_waybills.php" class="flex-fill">
+                <input type="hidden" name="token" value="<?= e($token) ?>">
+                <input type="hidden" name="id" value="<?= e((string)$w['id']) ?>">
+                <input type="hidden" name="action" value="end_trip">
+                <button type="submit" class="btn btn-soft-purple w-100 d-flex align-items-center justify-content-center gap-2">
+                  <span class="iconify" data-icon="solar:flag-bold"></span> پایان سفر
+                </button>
+              </form>
+            <?php elseif ($w['send_status'] === 'تحویل شده'): ?>
+              <div class="text-center w-100 text-muted small py-2">
+                <span class="iconify" data-icon="solar:check-circle-bold"></span> این سفر با موفقیت به پایان رسیده است.
+              </div>
+            <?php endif; ?>
+          </div>
       </div>
       <?php endforeach; ?>
     </div>
@@ -255,7 +353,7 @@ $statusClassMap = [
       <div class="card border-0 shadow-sm" style="border-radius: 1rem;">
         <div class="text-center text-muted p-5">
           <span class="iconify fs-1 d-block mb-2" data-icon="solar:fuel-line-duotone"></span>
-          در حال حاضر هیچ بارنامه‌ای با وضعیت «ثبت شده» یا «ارسال شده» برای شما ثبت نشده است.
+          در حال حاضر هیچ بارنامه‌ای برای شما ثبت نشده است.
         </div>
       </div>
     <?php endif; ?>
@@ -264,7 +362,7 @@ $statusClassMap = [
   <div class="text-center text-muted small mt-4">
     <span class="iconify" data-icon="solar:info-circle-bold"></span>
     این صفحه عمومی است و نیازی به ورود به پنل ندارد.
-    <?php if ($viaToken): ?>
+    <?php if ($driver): ?>
       توکن استفاده‌شده حداکثر <?= e((string)ACCESS_TOKEN_TTL_MINUTES) ?> دقیقه از زمان صدور معتبر است.
     <?php endif; ?>
   </div>
