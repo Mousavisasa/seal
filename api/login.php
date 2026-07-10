@@ -38,7 +38,8 @@ if (empty($input)) {
     }
 }
 
-$username = normalize_digits((string)($input['username'] ?? ''));
+$username = normalize_digits((string)($input['usernam
+e'] ?? ''));
 $password = (string)($input['password'] ?? '');
 
 if ($username === '' || $password === '') {

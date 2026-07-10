@@ -1,0 +1,222 @@
+<?php
+/**
+ * صفحه عمومی مشاهده بارنامه‌های راننده (بدون نیاز به ورود/سشن)
+ * با ارسال کد ملی و رمز عبور راننده (فرم POST)، بارنامه‌های با وضعیت
+ * «ثبت شده» و «ارسال شده» مربوط به همان راننده نمایش داده می‌شود.
+ *
+ * نکات امنیتی:
+ * - این صفحه به‌عمد از سیستم سشن/لاگین سراسری استفاده نمی‌کند؛ اعتبارسنجی
+ *   کاربر و رمز در هر درخواست به‌صورت مستقل انجام می‌شود.
+ * - فقط کاربرانی با user_type = 'driver' و is_active = 1 مجاز به مشاهده هستند.
+ * - رمز عبور هرگز در خروجی یا لاگ نمایش داده نمی‌شود.
+ * - از CSRF محافظت نمی‌شود چون کاربر لاگین/سشن ندارد؛ به همین دلیل این صفحه
+ *   هیچ عملیات نوشتنی (ثبت/ویرایش/حذف) انجام نمی‌دهد، فقط خواندنی است.
+ */
+require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/helpers/functions.php';
+require_once __DIR__ . '/helpers/jalali.php';
+
+$errors = [];
+$driver = null;
+$waybills = [];
+$submittedUsername = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $submittedUsername = normalize_digits((string)($_POST['username'] ?? ''));
+    $password = (string)($_POST['password'] ?? '');
+
+    if ($submittedUsername === '' || $password === '') {
+        $errors[] = 'نام کاربری (کد ملی) و رمز عبور را وارد کنید.';
+    } else {
+        try {
+            $stmt = db()->prepare("SELECT * FROM users WHERE national_code = ? AND user_type = 'driver' LIMIT 1");
+            $stmt->execute([$submittedUsername]);
+            $user = $stmt->fetch();
+
+            if (!$user || !password_verify($password, $user['password'])) {
+                $errors[] = 'نام کاربری یا رمز عبور نادرست است.';
+            } elseif ((int)($user['is_active'] ?? 1) === 0) {
+                $errors[] = 'حساب کاربری شما غیرفعال شده است. برای اطلاعات بیشتر با مدیر سامانه تماس بگیرید.';
+            } else {
+                $driver = $user;
+            }
+        } catch (PDOException $e) {
+            error_log('Driver waybills lookup auth error: ' . $e->getMessage());
+            $errors[] = 'خطایی رخ داد. لطفاً بعداً تلاش کنید.';
+        }
+    }
+
+    if ($driver) {
+        try {
+            $stmt = db()->prepare(
+                "SELECT w.*, ol.title AS origin_title, dl.title AS destination_title,
+                        opOrig.first_name AS origin_operator_first, opOrig.last_name AS origin_operator_last,
+                        opDest.first_name AS dest_operator_first, opDest.last_name AS dest_operator_last,
+                        sl.seal_id AS attached_seal_id
+                 FROM fuel_waybills w
+                 INNER JOIN locations ol ON ol.id = w.origin_location_id
+                 INNER JOIN locations dl ON dl.id = w.destination_location_id
+                 LEFT JOIN users opOrig ON opOrig.id = w.origin_operator_user_id
+                 LEFT JOIN users opDest ON opDest.id = w.destination_operator_user_id
+                 LEFT JOIN seals sl ON sl.fuel_waybill_id = w.id
+                 WHERE w.driver_user_id = ? AND w.send_status IN ('ثبت شده', 'ارسال شده')
+                 ORDER BY w.id DESC"
+            );
+            $stmt->execute([$driver['id']]);
+            $waybills = $stmt->fetchAll();
+        } catch (PDOException $e) {
+            error_log('Driver waybills lookup fetch error: ' . $e->getMessage());
+            $errors[] = 'خطایی در دریافت فهرست بارنامه‌ها رخ داد.';
+        }
+    }
+}
+
+$statusClassMap = [
+    'ثبت شده'   => 'status-registered',
+    'ارسال شده' => 'status-sent',
+];
+?>
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مشاهده بارنامه‌های راننده | <?= e(APP_NAME) ?></title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
+<script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
+</head>
+<body class="auth-body">
+
+<div class="w-100" style="max-width: 980px;">
+
+  <div class="text-center mb-4">
+    <span class="iconify fs-1 text-jade" data-icon="solar:bus-bold-duotone"></span>
+    <h1 class="h4 fw-bold mt-2 mb-1">مشاهده بارنامه‌های راننده</h1>
+    <p class="text-muted small mb-0">با کد ملی و رمز عبور خود وارد شوید تا بارنامه‌های در جریان خود را ببینید.</p>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4" style="border-radius: 1rem;">
+    <div class="card-body p-4">
+      <form method="post" action="<?= BASE_URL ?>/driver_waybills.php" novalidate>
+        <div class="row g-3 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label" for="username">کد ملی (نام کاربری)</label>
+            <div class="input-group">
+              <span class="input-group-text"><span class="iconify" data-icon="solar:card-2-bold"></span></span>
+              <input type="text" class="form-control ltr-text" id="username" name="username"
+                     inputmode="numeric" maxlength="10" required
+                     value="<?= e($submittedUsername) ?>" placeholder="مثلاً 3333333333">
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="password">رمز عبور</label>
+            <div class="input-group">
+              <span class="input-group-text"><span class="iconify" data-icon="solar:lock-password-bold"></span></span>
+              <input type="password" class="form-control" id="password" name="password" required placeholder="********">
+              <button type="button" class="input-group-text toggle-pass" data-target="password" aria-label="نمایش رمز">
+                <span class="iconify" data-icon="solar:eye-bold"></span>
+              </button>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <button type="submit" class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
+              <span class="iconify fs-5" data-icon="solar:magnifer-bold"></span> مشاهده بارنامه‌ها
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <?php if ($errors): ?>
+    <div class="alert alert-danger d-flex align-items-center gap-2">
+      <span class="iconify fs-5" data-icon="solar:danger-triangle-bold"></span>
+      <div>
+        <?php foreach ($errors as $err): ?>
+          <div><?= e($err) ?></div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  <?php endif; ?>
+
+  <?php if ($driver): ?>
+    <div class="card border-0 shadow-sm mb-3" style="border-radius: 1rem;">
+      <div class="card-body p-4 d-flex align-items-center gap-3">
+        <span class="iconify fs-1 text-purple" data-icon="solar:user-circle-bold-duotone"></span>
+        <div>
+          <div class="fw-bold fs-5"><?= e($driver['first_name'] . ' ' . $driver['last_name']) ?></div>
+          <div class="text-muted small ltr-text"><?= e($driver['national_code']) ?></div>
+        </div>
+        <div class="ms-auto text-muted small">
+          تعداد بارنامه در جریان: <span class="fw-bold"><?= e((string)count($waybills)) ?></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm" style="border-radius: 1rem;">
+      <div class="card-body p-0">
+        <?php if ($waybills): ?>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>شماره بارنامه</th>
+                <th>مبدا</th>
+                <th>مقصد</th>
+                <th>فرآورده</th>
+                <th>مسافت</th>
+                <th>تاریخ صدور</th>
+                <th>وضعیت</th>
+                <th>پلمپ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($waybills as $w): ?>
+              <tr>
+                <td class="ltr-text fw-bold"><?= e($w['waybill_number']) ?></td>
+                <td><?= e($w['origin_title']) ?></td>
+                <td><?= e($w['destination_title']) ?></td>
+                <td><span class="product-badge <?= e(product_badge_class($w['product_type'])) ?>"><?= e($w['product_type']) ?></span></td>
+                <td class="ltr-text"><?= e(number_format((float)$w['distance_km'], 0)) ?> کیلومتر</td>
+                <td class="ltr-text text-muted small"><?= e(to_jalali_display($w['issue_date'])) ?></td>
+                <td><span class="status-badge <?= e($statusClassMap[$w['send_status']] ?? '') ?>"><?= e($w['send_status']) ?></span></td>
+                <td class="ltr-text"><?= $w['attached_seal_id'] ? e($w['attached_seal_id']) : '<span class="text-muted">—</span>' ?></td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+        <?php else: ?>
+          <div class="text-center text-muted p-5">
+            <span class="iconify fs-1 d-block mb-2" data-icon="solar:fuel-line-duotone"></span>
+            در حال حاضر هیچ بارنامه‌ای با وضعیت «ثبت شده» یا «ارسال شده» برای شما ثبت نشده است.
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
+  <?php endif; ?>
+
+  <div class="text-center text-muted small mt-4">
+    <span class="iconify" data-icon="solar:info-circle-bold"></span>
+    این صفحه عمومی است و نیازی به ورود به پنل ندارد؛ اطلاعات فقط پس از وارد کردن رمز صحیح نمایش داده می‌شود.
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.querySelectorAll('.toggle-pass').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var input = document.getElementById(btn.getAttribute('data-target'));
+    if (!input) return;
+    var isPass = input.type === 'password';
+    input.type = isPass ? 'text' : 'password';
+    var icon = btn.querySelector('.iconify');
+    if (icon) icon.setAttribute('data-icon', isPass ? 'solar:eye-closed-bold' : 'solar:eye-bold');
+  });
+});
+</script>
+</body>
+</html>
