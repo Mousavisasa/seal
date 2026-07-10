@@ -190,15 +190,23 @@ require __DIR__ . '/includes/header.php';
 </div>
 
 <script>
-(function () {
-  if (typeof echarts === 'undefined') return;
+(function bootDriverCharts() {
+  if (typeof window.whenEChartsReady !== 'function') {
+    setTimeout(bootDriverCharts, 30);
+    return;
+  }
+  window.whenEChartsReady(function () {
   var fontFamily = "'Vazirmatn', Tahoma, sans-serif";
   var productColors = <?= json_encode(PRODUCT_COLORS, JSON_UNESCAPED_UNICODE) ?>;
+
+  window.__registeredCharts = window.__registeredCharts || [];
 
   function initChart(id) {
     var el = document.getElementById(id);
     if (!el) return null;
-    return echarts.init(el, null, { renderer: 'svg' });
+    var chart = echarts.init(el, null, { renderer: 'svg' });
+    window.__registeredCharts.push(chart);
+    return chart;
   }
 
   var statusChart = initChart('chartDriverStatus');
@@ -223,7 +231,6 @@ require __DIR__ . '/includes/header.php';
         data: statusData
       }]
     });
-    window.addEventListener('resize', function () { statusChart.resize(); });
   }
 
   var productChart = initChart('chartDriverProduct');
@@ -246,8 +253,8 @@ require __DIR__ . '/includes/header.php';
         barMaxWidth: 46
       }]
     });
-    window.addEventListener('resize', function () { productChart.resize(); });
   }
+  });
 })();
 </script>
 

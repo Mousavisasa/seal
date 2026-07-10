@@ -271,15 +271,23 @@ require __DIR__ . '/includes/header.php';
 </div>
 
 <script>
-(function () {
-  if (typeof echarts === 'undefined') return;
+(function bootRegionCharts() {
+  if (typeof window.whenEChartsReady !== 'function') {
+    setTimeout(bootRegionCharts, 30);
+    return;
+  }
+  window.whenEChartsReady(function () {
   var fontFamily = "'Vazirmatn', Tahoma, sans-serif";
   var productColors = <?= json_encode(PRODUCT_COLORS, JSON_UNESCAPED_UNICODE) ?>;
+
+  window.__registeredCharts = window.__registeredCharts || [];
 
   function initChart(id) {
     var el = document.getElementById(id);
     if (!el) return null;
-    return echarts.init(el, null, { renderer: 'svg' });
+    var chart = echarts.init(el, null, { renderer: 'svg' });
+    window.__registeredCharts.push(chart);
+    return chart;
   }
 
   function commonPieOption(data, palette) {
@@ -308,7 +316,6 @@ require __DIR__ . '/includes/header.php';
       { value: <?= (int)$waybillCounts['لغو شده'] ?>, name: 'لغو شده' }
     ];
     statusChart.setOption(commonPieOption(statusData, ['#7048c8', '#f2a93b', '#0da678', '#e05263']));
-    window.addEventListener('resize', function () { statusChart.resize(); });
   }
 
   var productChart = initChart('chartRegionProductType');
@@ -331,7 +338,6 @@ require __DIR__ . '/includes/header.php';
         barMaxWidth: 46
       }]
     });
-    window.addEventListener('resize', function () { productChart.resize(); });
   }
 
   var sealChart = initChart('chartRegionSealStatus');
@@ -343,8 +349,8 @@ require __DIR__ . '/includes/header.php';
       { value: <?= (int)$sealCounts['مفقود شده'] ?>, name: 'مفقود شده' }
     ];
     sealChart.setOption(commonPieOption(sealData, ['#7048c8', '#0da678', '#e05263', '#8a8f98']));
-    window.addEventListener('resize', function () { sealChart.resize(); });
   }
+  });
 })();
 </script>
 

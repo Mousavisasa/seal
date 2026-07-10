@@ -272,16 +272,25 @@ require __DIR__ . '/includes/header.php';
 </div>
 
 <script>
-(function () {
-  if (typeof echarts === 'undefined') return;
+(function bootAdminCharts() {
+  if (typeof window.whenEChartsReady !== 'function') {
+    // app.js هنوز کاملاً بارگذاری نشده (چون این اسکریپت قبل از پایین صفحه اجرا می‌شود)؛ کمی صبر می‌کنیم
+    setTimeout(bootAdminCharts, 30);
+    return;
+  }
+  window.whenEChartsReady(function () {
   var fontFamily = "'Vazirmatn', Tahoma, sans-serif";
   var productColors = <?= json_encode(PRODUCT_COLORS, JSON_UNESCAPED_UNICODE) ?>;
   var neutralPalette = ['#0da678', '#7048c8', '#f2a93b', '#e05263', '#4c9ee8', '#8bd3c7'];
 
+  window.__registeredCharts = window.__registeredCharts || [];
+
   function initChart(id) {
     var el = document.getElementById(id);
     if (!el) return null;
-    return echarts.init(el, null, { renderer: 'svg' });
+    var chart = echarts.init(el, null, { renderer: 'svg' });
+    window.__registeredCharts.push(chart);
+    return chart;
   }
 
   function commonPieOption(data, palette) {
@@ -311,7 +320,6 @@ require __DIR__ . '/includes/header.php';
       { value: <?= (int)$waybillCounts['لغو شده'] ?>, name: 'لغو شده' }
     ];
     statusChart.setOption(commonPieOption(statusData, ['#7048c8', '#f2a93b', '#0da678', '#e05263']));
-    window.addEventListener('resize', function () { statusChart.resize(); });
   }
 
   // توزیع نوع فرآورده — با رنگ‌های اختصاصی درخواستی
@@ -335,7 +343,6 @@ require __DIR__ . '/includes/header.php';
         barMaxWidth: 46
       }]
     });
-    window.addEventListener('resize', function () { productChart.resize(); });
   }
 
   // روند ثبت بارنامه
@@ -366,7 +373,6 @@ require __DIR__ . '/includes/header.php';
         }
       }]
     });
-    window.addEventListener('resize', function () { trendChart.resize(); });
   }
 
   // توزیع کاربران بر اساس نقش
@@ -379,7 +385,6 @@ require __DIR__ . '/includes/header.php';
       { value: <?= (int)$counts['driver'] ?>, name: 'راننده' }
     ];
     rolesChart.setOption(commonPieOption(rolesData, neutralPalette));
-    window.addEventListener('resize', function () { rolesChart.resize(); });
   }
 
   // وضعیت پلمپ‌ها
@@ -393,8 +398,8 @@ require __DIR__ . '/includes/header.php';
       { value: <?= (int)$sealCounts['مفقود شده'] ?>, name: 'مفقود شده' }
     ];
     sealChart.setOption(commonPieOption(sealData, ['#0da678', '#7048c8', '#4c9ee8', '#e05263', '#8a8f98']));
-    window.addEventListener('resize', function () { sealChart.resize(); });
   }
+  });
 })();
 </script>
 
