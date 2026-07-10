@@ -189,41 +189,45 @@ $statusClassMap = [
     </div>
 
     <?php if ($waybills): ?>
-    <div class="row g-3">
+    <div class="waybill-card-list">
       <?php foreach ($waybills as $w): ?>
-      <div class="col-12 col-md-6">
-        <div class="waybill-card">
+      <div class="waybill-card">
           <div class="waybill-card-head">
             <span class="waybill-card-number"><?= e($w['waybill_number']) ?></span>
             <span class="status-badge <?= e($statusClassMap[$w['send_status']] ?? '') ?>"><?= e($w['send_status']) ?></span>
           </div>
 
           <div class="waybill-card-route">
-            <span class="iconify" data-icon="solar:point-on-map-bold"></span>
-            <span class="waybill-card-route-text"><?= e($w['origin_title']) ?></span>
+            <span class="waybill-card-route-point">
+              <span class="iconify" data-icon="solar:point-on-map-bold"></span>
+              <span class="waybill-card-route-text"><?= e($w['origin_title']) ?></span>
+            </span>
             <span class="iconify waybill-card-route-arrow" data-icon="solar:arrow-left-bold"></span>
-            <span class="waybill-card-route-text"><?= e($w['destination_title']) ?></span>
+            <span class="waybill-card-route-point">
+              <span class="iconify" data-icon="solar:flag-bold"></span>
+              <span class="waybill-card-route-text"><?= e($w['destination_title']) ?></span>
+            </span>
           </div>
 
           <div class="waybill-card-meta">
             <div class="waybill-card-meta-item">
               <span class="iconify" data-icon="solar:fuel-bold"></span>
-              <span class="waybill-card-meta-label">فرآورده:</span>
+              <span class="waybill-card-meta-label">فرآورده</span>
               <span class="product-badge <?= e(product_badge_class($w['product_type'])) ?>"><?= e($w['product_type']) ?></span>
             </div>
             <div class="waybill-card-meta-item">
               <span class="iconify" data-icon="solar:ruler-bold"></span>
-              <span class="waybill-card-meta-label">مسافت:</span>
+              <span class="waybill-card-meta-label">مسافت</span>
               <span class="waybill-card-meta-value ltr-text"><?= e(number_format((float)$w['distance_km'], 0)) ?> کیلومتر</span>
             </div>
             <div class="waybill-card-meta-item">
               <span class="iconify" data-icon="solar:calendar-bold"></span>
-              <span class="waybill-card-meta-label">تاریخ صدور:</span>
+              <span class="waybill-card-meta-label">تاریخ صدور</span>
               <span class="waybill-card-meta-value ltr-text"><?= e(to_jalali_display($w['issue_date'])) ?></span>
             </div>
             <div class="waybill-card-meta-item">
               <span class="iconify" data-icon="solar:shield-keyhole-bold"></span>
-              <span class="waybill-card-meta-label">پلمپ:</span>
+              <span class="waybill-card-meta-label">پلمپ</span>
               <span class="waybill-card-meta-value ltr-text"><?= $w['attached_seal_id'] ? e($w['attached_seal_id']) : '—' ?></span>
             </div>
           </div>
@@ -244,7 +248,6 @@ $statusClassMap = [
             <?php endif; ?>
           </div>
           <?php endif; ?>
-        </div>
       </div>
       <?php endforeach; ?>
     </div>

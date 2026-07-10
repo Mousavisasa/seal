@@ -321,64 +321,122 @@ body { background: var(--surface); color: var(--ink); }
     radial-gradient(50rem 50rem at -10% 110%, rgba(13, 166, 120, .20), transparent 60%),
     var(--surface);
 }
-.public-page-wrap { max-width: 980px; margin: 0 auto; }
+.public-page-wrap { max-width: 720px; margin: 0 auto; }
 
-.waybill-card {
-  background: #fff;
-  border-radius: 1.1rem;
-  box-shadow: var(--soft-shadow);
-  padding: 1.1rem 1.2rem;
+.waybill-card-list {
   display: flex;
   flex-direction: column;
-  gap: .65rem;
-  height: 100%;
+  gap: 1rem;
 }
+
+.waybill-card {
+  position: relative;
+  background: #fff;
+  border-radius: 1.25rem;
+  box-shadow: 0 12px 30px -14px rgba(34, 48, 62, 0.22);
+  padding: 1.25rem 1.4rem 1.25rem 1.4rem;
+  padding-inline-start: 1.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: .9rem;
+  overflow: hidden;
+  transition: box-shadow .2s ease, transform .2s ease;
+  border: 1px solid #eef1f0;
+}
+.waybill-card::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: linear-gradient(180deg, var(--jade), var(--purple));
+}
+.waybill-card:hover {
+  box-shadow: 0 16px 36px -14px rgba(34, 48, 62, 0.28);
+  transform: translateY(-2px);
+}
+
 .waybill-card-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: .5rem;
+  flex-wrap: wrap;
 }
 .waybill-card-number {
   font-weight: 800;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   direction: ltr;
   text-align: right;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: .4rem;
 }
+.waybill-card-number::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--jade);
+  flex-shrink: 0;
+}
+
 .waybill-card-route {
   display: flex;
   align-items: center;
-  gap: .5rem;
-  background: var(--surface);
-  border-radius: .7rem;
-  padding: .6rem .75rem;
-  font-size: .88rem;
+  gap: .6rem;
+  background: linear-gradient(90deg, var(--jade-soft), var(--purple-soft));
+  border-radius: .9rem;
+  padding: .7rem .9rem;
+  font-size: .9rem;
+  font-weight: 600;
 }
-.waybill-card-route .iconify { flex-shrink: 0; color: var(--jade-dark); }
-.waybill-card-route-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.waybill-card-route-arrow { color: var(--dim); flex-shrink: 0; }
+.waybill-card-route-point {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  flex: 1;
+  min-width: 0;
+}
+.waybill-card-route-point .iconify { flex-shrink: 0; color: var(--jade-dark); font-size: 1.1rem; }
+.waybill-card-route-point:last-child .iconify { color: var(--purple-dark); }
+.waybill-card-route-text { overflow-wrap: anywhere; }
+.waybill-card-route-arrow { color: var(--dim); flex-shrink: 0; font-size: 1.1rem; }
 
 .waybill-card-meta {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: .5rem .75rem;
-  font-size: .82rem;
+  gap: .6rem 1rem;
+  font-size: .85rem;
 }
-.waybill-card-meta-item { display: flex; align-items: center; gap: .4rem; color: var(--ink); }
-.waybill-card-meta-item .iconify { color: var(--dim); font-size: 1rem; flex-shrink: 0; }
+.waybill-card-meta-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .4rem;
+  background: var(--surface);
+  border-radius: .6rem;
+  padding: .45rem .65rem;
+}
+.waybill-card-meta-item .iconify { color: var(--purple-dark); font-size: 1rem; flex-shrink: 0; }
 .waybill-card-meta-label { color: var(--dim); flex-shrink: 0; }
-.waybill-card-meta-value { font-weight: 600; overflow-wrap: anywhere; }
+.waybill-card-meta-value { font-weight: 700; color: var(--ink); overflow-wrap: anywhere; margin-inline-start: auto; }
 
 .waybill-card-footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: .5rem;
-  margin-top: auto;
-  padding-top: .5rem;
-  border-top: 1px solid #f0f3f2;
+  gap: .5rem 1.25rem;
+  padding-top: .75rem;
+  border-top: 1px dashed #e6ebe9;
 }
 
 @media (max-width: 575.98px) {
+  .waybill-card { padding: 1.1rem 1.1rem 1.1rem 1.1rem; padding-inline-start: 1.35rem; border-radius: 1rem; }
   .waybill-card-meta { grid-template-columns: 1fr; }
+  .waybill-card-meta-value { margin-inline-start: 0; }
+  .waybill-card-number { font-size: 1.05rem; }
 }
