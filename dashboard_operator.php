@@ -207,12 +207,18 @@ require __DIR__ . '/includes/header.php';
 </div>
 
 <script>
-(function bootOperatorCharts() {
-  if (typeof window.whenEChartsReady !== 'function') {
-    setTimeout(bootOperatorCharts, 30);
-    return;
+(function () {
+  function boot() {
+    if (typeof echarts === 'undefined') {
+      setTimeout(boot, 30);
+      return;
+    }
+    requestAnimationFrame(function () {
+      requestAnimationFrame(renderCharts);
+    });
   }
-  window.whenEChartsReady(function () {
+
+  function renderCharts() {
   var fontFamily = "'Vazirmatn', Tahoma, sans-serif";
   var productColors = <?= json_encode(PRODUCT_COLORS, JSON_UNESCAPED_UNICODE) ?>;
 
@@ -271,7 +277,13 @@ require __DIR__ . '/includes/header.php';
       }]
     });
   }
-  });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
 })();
 </script>
 
