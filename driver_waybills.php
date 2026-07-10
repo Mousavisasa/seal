@@ -259,104 +259,88 @@ $statusClassMap = [
         </div>
       </div>
     </div>
+<!--  /////////////////////////////////-->
+      <?php if ($waybills): ?>
+          <div class="row g-3">
+              <?php foreach ($waybills as $w): ?>
+                  <div class="col-md-6 col-xl-4">
+                      <div class="card panel-card h-100">
+                          <div class="card-body d-flex flex-column gap-2">
+                              <div class="d-flex justify-content-between align-items-start">
+                                  <div class="fw-bold ltr-text"><?= e($w['waybill_number']) ?></div>
+                                  <span class="status-badge <?= e($statusClassMap[$w['send_status']] ?? '') ?>"><?= e($w['send_status']) ?></span>
+                              </div>
 
-    <?php if ($waybills): ?>
-    <div class="waybill-card-list">
-      <?php foreach ($waybills as $w): ?>
-      <div class="waybill-card">
-          <div class="waybill-card-head">
-            <span class="waybill-card-number"><?= e($w['waybill_number']) ?></span>
-            <span class="status-badge <?= e($statusClassMap[$w['send_status']] ?? '') ?>"><?= e($w['send_status']) ?></span>
+                              <div class="small text-muted d-flex align-items-center gap-1">
+                                  <span class="iconify" data-icon="solar:point-on-map-bold"></span>
+                                  <?= e($w['origin_title']) ?> <span class="iconify" data-icon="solar:arrow-left-bold"></span> <?= e($w['destination_title']) ?>
+                              </div>
+
+                              <div class="small text-muted d-flex align-items-center gap-1">
+                                  <span class="iconify" data-icon="solar:fuel-bold"></span> <?= e($w['product_type']) ?>
+                                  <span class="mx-1">•</span>
+                                  <span class="iconify" data-icon="solar:ruler-bold"></span> <?= e(number_format((float)$w['distance_km'], 2)) ?> کیلومتر
+                              </div>
+
+                              <div class="small text-muted d-flex align-items-center gap-1">
+                                  <span class="iconify" data-icon="solar:calendar-bold"></span> تاریخ صدور: <?= e(to_jalali_display($w['issue_date'])) ?>
+                              </div>
+
+                              <?php if ($w['origin_operator_first']): ?>
+                                  <div class="small text-muted d-flex align-items-center gap-1">
+                                      <span class="iconify" data-icon="solar:user-id-bold"></span> متصدی مبدا: <?= e($w['origin_operator_first'] . ' ' . $w['origin_operator_last']) ?>
+                                  </div>
+                              <?php endif; ?>
+
+                              <?php if ($w['dest_operator_first']): ?>
+                                  <div class="small text-muted d-flex align-items-center gap-1">
+                                      <span class="iconify" data-icon="solar:user-id-bold"></span> متصدی مقصد: <?= e($w['dest_operator_first'] . ' ' . $w['dest_operator_last']) ?>
+                                  </div>
+                              <?php endif; ?>
+
+                              <div class="mt-auto pt-2 d-flex gap-2">
+                                  <?php if ($w['send_status'] === 'ثبت شده'): ?>
+                                      <form method="post" action="<?= BASE_URL ?>/waybills/my_trips.php" class="flex-fill">
+                                          <?= csrf_field() ?>
+                                          <input type="hidden" name="id" value="<?= e((string)$w['id']) ?>">
+                                          <input type="hidden" name="action" value="start_trip">
+                                          <button type="submit" class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
+                                              <span class="iconify" data-icon="solar:play-circle-bold"></span> شروع سفر
+                                          </button>
+                                      </form>
+                                  <?php elseif ($w['send_status'] === 'ارسال شده'): ?>
+                                      <form method="post" action="<?= BASE_URL ?>/waybills/my_trips.php" class="flex-fill">
+                                          <?= csrf_field() ?>
+                                          <input type="hidden" name="id" value="<?= e((string)$w['id']) ?>">
+                                          <input type="hidden" name="action" value="end_trip">
+                                          <button type="submit" class="btn btn-soft-purple w-100 d-flex align-items-center justify-content-center gap-2">
+                                              <span class="iconify" data-icon="solar:flag-bold"></span> پایان سفر
+                                          </button>
+                                      </form>
+                                  <?php elseif ($w['send_status'] === 'تحویل شده'): ?>
+                                      <div class="text-center w-100 text-muted small py-2">
+                                          <span class="iconify" data-icon="solar:check-circle-bold"></span> این سفر با موفقیت به پایان رسیده است.
+                                      </div>
+                                  <?php else: ?>
+                                      <div class="text-center w-100 text-muted small py-2">این بارنامه لغو شده است.</div>
+                                  <?php endif; ?>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              <?php endforeach; ?>
           </div>
-
-          <div class="waybill-card-route">
-            <span class="waybill-card-route-point">
-              <span class="iconify" data-icon="solar:point-on-map-bold"></span>
-              <span class="waybill-card-route-text"><?= e($w['origin_title']) ?></span>
-            </span>
-            <span class="iconify waybill-card-route-arrow" data-icon="solar:arrow-left-bold"></span>
-            <span class="waybill-card-route-point">
-              <span class="iconify" data-icon="solar:flag-bold"></span>
-              <span class="waybill-card-route-text"><?= e($w['destination_title']) ?></span>
-            </span>
-          </div>
-
-          <div class="waybill-card-meta">
-            <div class="waybill-card-meta-item">
-              <span class="iconify" data-icon="solar:fuel-bold"></span>
-              <span class="waybill-card-meta-label">فرآورده</span>
-              <span class="product-badge <?= e(product_badge_class($w['product_type'])) ?>"><?= e($w['product_type']) ?></span>
-            </div>
-            <div class="waybill-card-meta-item">
-              <span class="iconify" data-icon="solar:ruler-bold"></span>
-              <span class="waybill-card-meta-label">مسافت</span>
-              <span class="waybill-card-meta-value ltr-text"><?= e(number_format((float)$w['distance_km'], 0)) ?> کیلومتر</span>
-            </div>
-            <div class="waybill-card-meta-item">
-              <span class="iconify" data-icon="solar:calendar-bold"></span>
-              <span class="waybill-card-meta-label">تاریخ صدور</span>
-              <span class="waybill-card-meta-value ltr-text"><?= e(to_jalali_display($w['issue_date'])) ?></span>
-            </div>
-            <div class="waybill-card-meta-item">
-              <span class="iconify" data-icon="solar:shield-keyhole-bold"></span>
-              <span class="waybill-card-meta-label">پلمپ</span>
-              <span class="waybill-card-meta-value ltr-text"><?= $w['attached_seal_id'] ? e($w['attached_seal_id']) : '—' ?></span>
-            </div>
-          </div>
-
-          <?php if ($w['origin_operator_first'] || $w['dest_operator_first']): ?>
-          <div class="waybill-card-footer">
-            <?php if ($w['origin_operator_first']): ?>
-              <span class="text-muted small d-flex align-items-center gap-1">
-                <span class="iconify" data-icon="solar:user-id-bold"></span>
-                متصدی مبدا: <?= e($w['origin_operator_first'] . ' ' . $w['origin_operator_last']) ?>
-              </span>
-            <?php endif; ?>
-            <?php if ($w['dest_operator_first']): ?>
-              <span class="text-muted small d-flex align-items-center gap-1">
-                <span class="iconify" data-icon="solar:user-id-bold"></span>
-                متصدی مقصد: <?= e($w['dest_operator_first'] . ' ' . $w['dest_operator_last']) ?>
-              </span>
-            <?php endif; ?>
-          </div>
-          <?php endif; ?>
-
-          <div class="waybill-card-actions">
-            <?php if ($w['send_status'] === 'ثبت شده'): ?>
-              <form method="post" action="<?= BASE_URL ?>/driver_waybills.php" class="flex-fill">
-                <input type="hidden" name="token" value="<?= e($token) ?>">
-                <input type="hidden" name="id" value="<?= e((string)$w['id']) ?>">
-                <input type="hidden" name="action" value="start_trip">
-                <button type="submit" class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
-                  <span class="iconify" data-icon="solar:play-circle-bold"></span> شروع سفر
-                </button>
-              </form>
-            <?php elseif ($w['send_status'] === 'ارسال شده'): ?>
-              <form method="post" action="<?= BASE_URL ?>/driver_waybills.php" class="flex-fill">
-                <input type="hidden" name="token" value="<?= e($token) ?>">
-                <input type="hidden" name="id" value="<?= e((string)$w['id']) ?>">
-                <input type="hidden" name="action" value="end_trip">
-                <button type="submit" class="btn btn-soft-purple w-100 d-flex align-items-center justify-content-center gap-2">
-                  <span class="iconify" data-icon="solar:flag-bold"></span> پایان سفر
-                </button>
-              </form>
-            <?php elseif ($w['send_status'] === 'تحویل شده'): ?>
-              <div class="text-center w-100 text-muted small py-2">
-                <span class="iconify" data-icon="solar:check-circle-bold"></span> این سفر با موفقیت به پایان رسیده است.
+      <?php else: ?>
+          <div class="card panel-card">
+              <div class="card-body text-center text-muted p-5">
+                  <span class="iconify fs-1 d-block mb-2" data-icon="solar:bus-line-duotone"></span>
+                  در حال حاضر هیچ بارنامه‌ای به شما تخصیص داده نشده است.
               </div>
-            <?php endif; ?>
           </div>
-      </div>
-      <?php endforeach; ?>
-    </div>
-    <?php else: ?>
-      <div class="card border-0 shadow-sm" style="border-radius: 1rem;">
-        <div class="text-center text-muted p-5">
-          <span class="iconify fs-1 d-block mb-2" data-icon="solar:fuel-line-duotone"></span>
-          در حال حاضر هیچ بارنامه‌ای برای شما ثبت نشده است.
-        </div>
-      </div>
-    <?php endif; ?>
+      <?php endif; ?>
+
+<!--  /////////////////////////////////-->
+
   <?php endif; ?>
 
   <div class="text-center text-muted small mt-4">
