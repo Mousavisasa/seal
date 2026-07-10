@@ -1,27 +1,50 @@
 <?php
 /**
- * صفحه عمومی مشاهده بارنامه‌های راننده (بدون نیاز به ورود/سشن)
- * با ارسال کد ملی و رمز عبور راننده (فرم POST)، بارنامه‌های با وضعیت
- * «ثبت شده» و «ارسال شده» مربوط به همان راننده نمایش داده می‌شود.
+ * صفحه عمومی مشاهده بارنامه‌های راننده (بدون نیاز به سشن/ورود به پنل)
  *
- * نکات امنیتی:
- * - این صفحه به‌عمد از سیستم سشن/لاگین سراسری استفاده نمی‌کند؛ اعتبارسنجی
- *   کاربر و رمز در هر درخواست به‌صورت مستقل انجام می‌شود.
- * - فقط کاربرانی با user_type = 'driver' و is_active = 1 مجاز به مشاهده هستند.
- * - رمز عبور هرگز در خروجی یا لاگ نمایش داده نمی‌شود.
- * - از CSRF محافظت نمی‌شود چون کاربر لاگین/سشن ندارد؛ به همین دلیل این صفحه
- *   هیچ عملیات نوشتنی (ثبت/ویرایش/حذف) انجام نمی‌دهد، فقط خواندنی است.
+ * دو روش استفاده:
+ * ۱) با توکن: driver_waybills.php?token=...
+ *    توکن از طریق وب‌سرویس ورود (api/login.php) گرفته می‌شود و حداکثر
+ *    ۱۰ دقیقه اعتبار دارد. این روش رمز عبور را در URL قرار نمی‌دهد.
+ * ۲) با فرم: اگر توکن ارسال نشود یا نامعتبر/منقضی باشد، فرم ساده کد ملی
+ *    و رمز عبور نمایش داده می‌شود (برای استفاده مستقیم در مرورگر).
+ *
+ * در هر دو حالت فقط بارنامه‌های با وضعیت «ثبت شده» و «ارسال شده» نمایش داده می‌شود.
  */
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/helpers/functions.php';
 require_once __DIR__ . '/helpers/jalali.php';
+require_once __DIR__ . '/helpers/tokens.php';
 
 $errors = [];
 $driver = null;
 $waybills = [];
 $submittedUsername = '';
+$viaToken = false;
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// ---------- روش ۱: ورود با توکن (GET) ----------
+$tokenParam = trim((string)($_GET['token'] ?? ''));
+if ($tokenParam !== '') {
+    $viaToken = true;
+    try {
+        $driver = validate_access_token($tokenParam, 'driver_waybills');
+        if (!$driver) {
+            $errors[] = 'توکن نامعتبر است یا منقضی شده است. لطفاً دوباره وارد شوید.';
+        } elseif ($driver['user_type'] !== 'driver') {
+            $driver = null;
+            $errors[] = 'این توکن متعلق به یک حساب راننده نیست.';
+        } elseif ((int)($driver['is_active'] ?? 1) === 0) {
+            $driver = null;
+            $errors[] = 'حساب کاربری شما غیرفعال شده است. برای اطلاعات بیشتر با مدیر سامانه تماس بگیرید.';
+        }
+    } catch (PDOException $e) {
+        error_log('Driver waybills token validate error: ' . $e->getMessage());
+        $errors[] = 'خطایی رخ داد. لطفاً بعداً تلاش کنید.';
+    }
+}
+
+// ---------- روش ۲: ورود مستقیم با فرم (POST) ----------
+if (!$viaToken && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $submittedUsername = normalize_digits((string)($_POST['username'] ?? ''));
     $password = (string)($_POST['password'] ?? '');
 
@@ -38,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } elseif ((int)($user['is_active'] ?? 1) === 0) {
                 $errors[] = 'حساب کاربری شما غیرفعال شده است. برای اطلاعات بیشتر با مدیر سامانه تماس بگیرید.';
             } else {
+                unset($user['password']);
                 $driver = $user;
             }
         } catch (PDOException $e) {
@@ -45,29 +69,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'خطایی رخ داد. لطفاً بعداً تلاش کنید.';
         }
     }
+}
 
-    if ($driver) {
-        try {
-            $stmt = db()->prepare(
-                "SELECT w.*, ol.title AS origin_title, dl.title AS destination_title,
-                        opOrig.first_name AS origin_operator_first, opOrig.last_name AS origin_operator_last,
-                        opDest.first_name AS dest_operator_first, opDest.last_name AS dest_operator_last,
-                        sl.seal_id AS attached_seal_id
-                 FROM fuel_waybills w
-                 INNER JOIN locations ol ON ol.id = w.origin_location_id
-                 INNER JOIN locations dl ON dl.id = w.destination_location_id
-                 LEFT JOIN users opOrig ON opOrig.id = w.origin_operator_user_id
-                 LEFT JOIN users opDest ON opDest.id = w.destination_operator_user_id
-                 LEFT JOIN seals sl ON sl.fuel_waybill_id = w.id
-                 WHERE w.driver_user_id = ? AND w.send_status IN ('ثبت شده', 'ارسال شده')
-                 ORDER BY w.id DESC"
-            );
-            $stmt->execute([$driver['id']]);
-            $waybills = $stmt->fetchAll();
-        } catch (PDOException $e) {
-            error_log('Driver waybills lookup fetch error: ' . $e->getMessage());
-            $errors[] = 'خطایی در دریافت فهرست بارنامه‌ها رخ داد.';
-        }
+// ---------- دریافت بارنامه‌ها در صورت احراز هویت موفق (هر دو روش) ----------
+if ($driver) {
+    try {
+        $stmt = db()->prepare(
+            "SELECT w.*, ol.title AS origin_title, dl.title AS destination_title,
+                    opOrig.first_name AS origin_operator_first, opOrig.last_name AS origin_operator_last,
+                    opDest.first_name AS dest_operator_first, opDest.last_name AS dest_operator_last,
+                    sl.seal_id AS attached_seal_id
+             FROM fuel_waybills w
+             INNER JOIN locations ol ON ol.id = w.origin_location_id
+             INNER JOIN locations dl ON dl.id = w.destination_location_id
+             LEFT JOIN users opOrig ON opOrig.id = w.origin_operator_user_id
+             LEFT JOIN users opDest ON opDest.id = w.destination_operator_user_id
+             LEFT JOIN seals sl ON sl.fuel_waybill_id = w.id
+             WHERE w.driver_user_id = ? AND w.send_status IN ('ثبت شده', 'ارسال شده')
+             ORDER BY w.id DESC"
+        );
+        $stmt->execute([$driver['id']]);
+        $waybills = $stmt->fetchAll();
+    } catch (PDOException $e) {
+        error_log('Driver waybills lookup fetch error: ' . $e->getMessage());
+        $errors[] = 'خطایی در دریافت فهرست بارنامه‌ها رخ داد.';
     }
 }
 
@@ -94,9 +119,16 @@ $statusClassMap = [
   <div class="text-center mb-4">
     <span class="iconify fs-1 text-jade" data-icon="solar:bus-bold-duotone"></span>
     <h1 class="h4 fw-bold mt-2 mb-1">مشاهده بارنامه‌های راننده</h1>
-    <p class="text-muted small mb-0">با کد ملی و رمز عبور خود وارد شوید تا بارنامه‌های در جریان خود را ببینید.</p>
+    <p class="text-muted small mb-0">
+      <?php if ($viaToken && $driver): ?>
+        ورود با توکن موقت انجام شد.
+      <?php else: ?>
+        با کد ملی و رمز عبور خود وارد شوید تا بارنامه‌های در جریان خود را ببینید.
+      <?php endif; ?>
+    </p>
   </div>
 
+  <?php if (!$driver): ?>
   <div class="card border-0 shadow-sm mb-4" style="border-radius: 1rem;">
     <div class="card-body p-4">
       <form method="post" action="<?= BASE_URL ?>/driver_waybills.php" novalidate>
@@ -129,6 +161,7 @@ $statusClassMap = [
       </form>
     </div>
   </div>
+  <?php endif; ?>
 
   <?php if ($errors): ?>
     <div class="alert alert-danger d-flex align-items-center gap-2">
@@ -200,7 +233,10 @@ $statusClassMap = [
 
   <div class="text-center text-muted small mt-4">
     <span class="iconify" data-icon="solar:info-circle-bold"></span>
-    این صفحه عمومی است و نیازی به ورود به پنل ندارد؛ اطلاعات فقط پس از وارد کردن رمز صحیح نمایش داده می‌شود.
+    این صفحه عمومی است و نیازی به ورود به پنل ندارد.
+    <?php if ($viaToken): ?>
+      توکن استفاده‌شده حداکثر <?= e((string)ACCESS_TOKEN_TTL_MINUTES) ?> دقیقه از زمان صدور معتبر است.
+    <?php endif; ?>
   </div>
 
 </div>
