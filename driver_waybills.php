@@ -259,7 +259,7 @@ $statusClassMap = [
         </div>
       </div>
     </div>
-<!--  /////////////////////////////////-->
+
       <?php if ($waybills): ?>
           <div class="row g-3">
               <?php foreach ($waybills as $w): ?>
@@ -300,8 +300,8 @@ $statusClassMap = [
 
                               <div class="mt-auto pt-2 d-flex gap-2">
                                   <?php if ($w['send_status'] === 'ثبت شده'): ?>
-                                      <form method="post" action="<?= BASE_URL ?>/waybills/my_trips.php" class="flex-fill">
-                                          <?= csrf_field() ?>
+                                      <form method="post" action="<?= BASE_URL ?>/driver_waybills.php" class="flex-fill">
+                                          <input type="hidden" name="token" value="<?= e($token) ?>">
                                           <input type="hidden" name="id" value="<?= e((string)$w['id']) ?>">
                                           <input type="hidden" name="action" value="start_trip">
                                           <button type="submit" class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
@@ -309,8 +309,8 @@ $statusClassMap = [
                                           </button>
                                       </form>
                                   <?php elseif ($w['send_status'] === 'ارسال شده'): ?>
-                                      <form method="post" action="<?= BASE_URL ?>/waybills/my_trips.php" class="flex-fill">
-                                          <?= csrf_field() ?>
+                                      <form method="post" action="<?= BASE_URL ?>/driver_waybills.php" class="flex-fill">
+                                          <input type="hidden" name="token" value="<?= e($token) ?>">
                                           <input type="hidden" name="id" value="<?= e((string)$w['id']) ?>">
                                           <input type="hidden" name="action" value="end_trip">
                                           <button type="submit" class="btn btn-soft-purple w-100 d-flex align-items-center justify-content-center gap-2">
@@ -338,8 +338,6 @@ $statusClassMap = [
               </div>
           </div>
       <?php endif; ?>
-
-<!--  /////////////////////////////////-->
 
   <?php endif; ?>
 

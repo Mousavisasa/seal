@@ -174,7 +174,7 @@ body { background: var(--surface); color: var(--ink); }
 .text-danger-link:hover { background: rgba(255,120,120,.12) !important; }
 
 /* منوی کناری در موبایل */
-@media (max-width: 991px) {
+@media (max-width: 991.98px) {
   .sidebar {
     position: fixed;
     inset-block: 0;
@@ -324,12 +324,10 @@ body { background: var(--surface); color: var(--ink); }
 .public-page-wrap { max-width: 720px; margin: 0 auto; }
 
 .waybill-card-list {
-  border: 0;
-  border-radius: var(--card-radius);
-  box-shadow: var(--soft-shadow);
-  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
-
 
 .waybill-card {
   position: relative;
@@ -443,7 +441,7 @@ body { background: var(--surface); color: var(--ink); }
 }
 .waybill-card-actions form { display: flex; flex: 1; }
 
-@media (max-width: 575px) {
+@media (max-width: 575.98px) {
   .waybill-card { padding: 1.1rem 1.1rem 1.1rem 1.1rem; padding-inline-start: 1.35rem; border-radius: 1rem; }
   .waybill-card-meta { grid-template-columns: 1fr; }
   .waybill-card-meta-value { margin-inline-start: 0; }
