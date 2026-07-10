@@ -272,18 +272,13 @@ require __DIR__ . '/includes/header.php';
 </div>
 
 <script>
-(function () {
-  function boot() {
-    if (typeof echarts === 'undefined') {
-      setTimeout(boot, 30);
-      return;
-    }
-    requestAnimationFrame(function () {
-      requestAnimationFrame(renderCharts);
-    });
+(function bootAdminCharts() {
+  if (typeof window.whenEChartsReady !== 'function') {
+    // app.js هنوز کاملاً بارگذاری نشده (چون این اسکریپت قبل از پایین صفحه اجرا می‌شود)؛ کمی صبر می‌کنیم
+    setTimeout(bootAdminCharts, 30);
+    return;
   }
-
-  function renderCharts() {
+  window.whenEChartsReady(function () {
   var fontFamily = "'Vazirmatn', Tahoma, sans-serif";
   var productColors = <?= json_encode(PRODUCT_COLORS, JSON_UNESCAPED_UNICODE) ?>;
   var neutralPalette = ['#0da678', '#7048c8', '#f2a93b', '#e05263', '#4c9ee8', '#8bd3c7'];
@@ -404,13 +399,7 @@ require __DIR__ . '/includes/header.php';
     ];
     sealChart.setOption(commonPieOption(sealData, ['#0da678', '#7048c8', '#4c9ee8', '#e05263', '#8a8f98']));
   }
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
-  } else {
-    boot();
-  }
+  });
 })();
 </script>
 

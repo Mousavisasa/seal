@@ -271,18 +271,12 @@ require __DIR__ . '/includes/header.php';
 </div>
 
 <script>
-(function () {
-  function boot() {
-    if (typeof echarts === 'undefined') {
-      setTimeout(boot, 30);
-      return;
-    }
-    requestAnimationFrame(function () {
-      requestAnimationFrame(renderCharts);
-    });
+(function bootRegionCharts() {
+  if (typeof window.whenEChartsReady !== 'function') {
+    setTimeout(bootRegionCharts, 30);
+    return;
   }
-
-  function renderCharts() {
+  window.whenEChartsReady(function () {
   var fontFamily = "'Vazirmatn', Tahoma, sans-serif";
   var productColors = <?= json_encode(PRODUCT_COLORS, JSON_UNESCAPED_UNICODE) ?>;
 
@@ -356,13 +350,7 @@ require __DIR__ . '/includes/header.php';
     ];
     sealChart.setOption(commonPieOption(sealData, ['#7048c8', '#0da678', '#e05263', '#8a8f98']));
   }
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
-  } else {
-    boot();
-  }
+  });
 })();
 </script>
 

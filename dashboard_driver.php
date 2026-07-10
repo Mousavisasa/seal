@@ -190,18 +190,12 @@ require __DIR__ . '/includes/header.php';
 </div>
 
 <script>
-(function () {
-  function boot() {
-    if (typeof echarts === 'undefined') {
-      setTimeout(boot, 30);
-      return;
-    }
-    requestAnimationFrame(function () {
-      requestAnimationFrame(renderCharts);
-    });
+(function bootDriverCharts() {
+  if (typeof window.whenEChartsReady !== 'function') {
+    setTimeout(bootDriverCharts, 30);
+    return;
   }
-
-  function renderCharts() {
+  window.whenEChartsReady(function () {
   var fontFamily = "'Vazirmatn', Tahoma, sans-serif";
   var productColors = <?= json_encode(PRODUCT_COLORS, JSON_UNESCAPED_UNICODE) ?>;
 
@@ -260,13 +254,7 @@ require __DIR__ . '/includes/header.php';
       }]
     });
   }
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
-  } else {
-    boot();
-  }
+  });
 })();
 </script>
 
