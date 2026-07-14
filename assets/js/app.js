@@ -286,19 +286,31 @@
 
   jQuery('[data-jalali-datepicker]').each(function () {
     var $input = jQuery(this);
-    var hasValue = $input.val() && $input.val().trim() !== '';
-
-    $input.persianDatepicker({
-      format: 'YYYY/MM/DD',
-      autoClose: true,
-      // اگر فیلد از قبل مقداری دارد (مثلاً تاریخ امروز که توسط سرور پر شده)،
-      // همان مقدار در تقویم هم انتخاب‌شده نمایش داده شود؛ در غیر این صورت خالی بماند.
-      initialValue: hasValue,
-      observer: true,
-      toolbox: {
-        calendarSwitch: { enabled: false }
-      }
+    var rawValue = ($input.val() || '').trim();
+    // ارقام فارسی احتمالی را به انگلیسی تبدیل می‌کنیم تا الگوی زیر همیشه تطبیق پیدا کند
+    var normalized = rawValue.replace(/[۰-۹]/g, function (d) {
+      return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d);
     });
+    var match = normalized.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+    // فرمت مورد قبول این نسخه از کتابخانه با صفر ابتدایی است؛ عدد را مستقیماً پد می‌کنیم
+    var selectedDateStr = match
+      ? match[1] + '/' + ('0' + match[2]).slice(-2) + '/' + ('0' + match[3]).slice(-2)
+      : null;
+
+    // نکته مهم: نام صحیح گزینه‌های این کتابخانه formatDate و selectedDate است،
+    // نه format و initialValue (که در نسخه‌های دیگر کتابخانه‌های مشابه استفاده می‌شود
+    // و در این نسخه به‌سادگی نادیده گرفته می‌شدند و باعث محاسبه اشتباه تاریخ می‌شدند).
+    $input.persianDatepicker({
+      formatDate: 'YYYY/MM/DD',
+      selectedDate: selectedDateStr,
+      autoClose: true,
+      isRTL: true
+    });
+
+    // مطمئن می‌شویم مقدار نمایشی input هرگز توسط کتابخانه بازنویسی نشده باشد
+    if (rawValue) {
+      $input.val(rawValue);
+    }
   });
 })();
 

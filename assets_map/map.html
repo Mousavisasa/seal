@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>نقشه پیشرفته</title>
+
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"
+    />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <section class="ui-panel search-panel" aria-label="جستجو و نتایج">
+      <div class="search-panel-header">
+        <h2 class="search-panel-title">جستجو</h2>
+        <div class="search-row">
+          <div class="search-input-wrap">
+            <img src="line-md--search.svg" alt="" />
+            <input
+              id="searchInput"
+              type="text"
+              placeholder="نام مکان، آدرس یا نقطه مورد نظر"
+              autocomplete="off"
+            />
+          </div>
+          <button id="searchBtn" class="primary-btn" type="button" aria-label="جستجو">
+            <img id="searchBtnIcon" src="line-md--search.svg" alt="" />
+          </button>
+        </div>
+        <div id="searchStatus" class="search-status">
+          برای جستجو، کلید API را در ابتدای فایل تنظیم کنید.
+        </div>
+      </div>
+
+      <div class="results-panel-body">
+        <div id="resultsList" class="results-list">
+          <div class="results-empty">هنوز نتیجه ای نمایش داده نشده است.</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="map-actions-right">
+      <div class="layer-dropdown-wrap">
+        <div id="layerMenu" class="ui-panel layer-menu" aria-label="انتخاب لایه">
+          <div class="layer-menu-title">لایه های پایه</div>
+          <div class="layer-list" id="layerList"></div>
+        </div>
+
+        <button id="layerToggleBtn" class="fab-btn" type="button" aria-label="نمایش لایه ها">
+          <img src="line-md--image-filled.svg" alt="" />
+        </button>
+      </div>
+
+      <div class="fab-group">
+        <button id="locateBtn" class="fab-btn" type="button" aria-label="موقعیت من">
+          <img src="line-md--my-location.svg" alt="" />
+        </button>
+      </div>
+    </div>
+
+    <div class="map-actions-left">
+      <button id="geoCodeBtn" class="fab-btn" type="button" aria-label="نمایش GeoJSON">
+        <img src="line-md--document-code.svg" alt="" />
+      </button>
+    </div>
+
+    <pre id="output" class="hidden-output"></pre>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
+    <script>
+      const MAPIR_API_KEY = window.MAP_IR_API_KEY || "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImp0aSI6ImQ2ZDdlYjQ4MTFhNjU4ZTliMjk0YTdlZGVmMzVmZjQxOWU3NjBkOWM5MzQxMzM4YmJjODk1MzVkOTFkYzM1NGQzZWQ1YjFmMDZiODY3ZWQzIn0.eyJhdWQiOiI0Mjc1MyIsImp0aSI6ImQ2ZDdlYjQ4MTFhNjU4ZTliMjk0YTdlZGVmMzVmZjQxOWU3NjBkOWM5MzQxMzM4YmJjODk1MzVkOTFkYzM1NGQzZWQ1YjFmMDZiODY3ZWQzIiwiaWF0IjoxNzg0MDE5MjIxLCJuYmYiOjE3ODQwMTkyMjEsImV4cCI6MTc4NjYxMTIyMSwic3ViIjoiIiwic2NvcGVzIjpbImJhc2ljIl19.Pq3H-95Me7bYUojFvjh0G1I4c6XW6JgvwddnzqCAa2rJ5VOa-iuwbtbhRBh49F3Gffx3bX1Oomjz2DEPEql3cwrp33gJn7QNAR9tTQHnly1CmvzxIkuAPzHlO7K-h3l1jY1h_D-ll6jkNHIo-iTgMV6yYQOE5IYrLJD0HQsa8nKT0FDX-MZJ59QSPaxrhvOe-g2tzkQa-gLJmTTcB93CqMIGyQ8F8wRd18v5NIY17Rdm4UWGPrT3KlnELD-JYKlZVbNc1x4A25PuZK3CWTE7QxQF6jzYXBprD1sb6FbZF8cgevq157xFJHzz6u6LBZ1Ja6dwQcERICiloNLKKJZ6Dw";
+      const MAPIR_SEARCH_ENDPOINT = "https://map.ir/search/v2";
+
+      const TILE_URLS = {
+        osm: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        googleSatellite: "https://memaps.ir/api/google-earth/satellite/{z}/{x}/{y}.png",
+        memapsHot: "https://memaps.ir/hot/{z}/{x}/{y}.png",
+        memapsHotDark: "https://memaps.ir/dark/{z}/{x}/{y}.png"
+      };
+
+      const layerConfigs = {
+        osm: {
+          label: "نقشه جهانی (روز)",
+          url: TILE_URLS.osm,
+          options: {
+            maxZoom: 19,
+            attribution: "&copy; OpenStreetMap contributors"
+          }
+        },
+        googleSatellite: {
+          label: "نقشه ماهواره ای (داخلی)",
+          url: TILE_URLS.googleSatellite,
+          options: {
+            maxZoom: 20,
+            attribution: "Google Satellite via Memaps"
+          }
+        },
+        memapsHot: {
+          label: "تم روز (داخلی)",
+          url: TILE_URLS.memapsHot,
+          options: {
+            maxZoom: 20,
+            attribution: "Memaps Hot"
+          }
+        },
+        memapsHotDark: {
+          label: "تم شب (داخلی)",
+          url: TILE_URLS.memapsHotDark,
+          options: {
+            maxZoom: 20,
+            attribution: "Memaps Hot Dark"
+          }
+        }
+      };
+
+      const map = L.map("map", {
+        center: [35.6892, 51.389],
+        zoom: 12,
+        zoomControl: true
+      });
+
+      const overlays = new L.FeatureGroup();
+      overlays.addTo(map);
+
+      let currentBaseLayer = null;
+      let currentBaseLayerKey = "memapsHot";
+      let userMarker = null;
+      let userCircle = null;
+      let geoJsonPopup = null;
+
+      const searchMarkers = L.layerGroup().addTo(map);
+
+      const searchInput = document.getElementById("searchInput");
+      const searchBtn = document.getElementById("searchBtn");
+      const searchBtnIcon = document.getElementById("searchBtnIcon");
+      const searchStatus = document.getElementById("searchStatus");
+      const resultsList = document.getElementById("resultsList");
+      const layerMenu = document.getElementById("layerMenu");
+      const layerList = document.getElementById("layerList");
+      const layerToggleBtn = document.getElementById("layerToggleBtn");
+      const locateBtn = document.getElementById("locateBtn");
+      const geoCodeBtn = document.getElementById("geoCodeBtn");
+      const output = document.getElementById("output");
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, function (char) {
+          const chars = {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;"
+          };
+          return chars[char] || char;
+        });
+      }
+
+      function createBaseLayer(key) {
+        const config = layerConfigs[key];
+        return L.tileLayer(config.url, config.options);
+      }
+
+      function setBaseLayer(key) {
+        if (!layerConfigs[key]) {
+          return;
+        }
+
+        if (currentBaseLayer) {
+          map.removeLayer(currentBaseLayer);
+        }
+
+        currentBaseLayer = createBaseLayer(key);
+        currentBaseLayer.addTo(map);
+        currentBaseLayerKey = key;
+        renderLayerButtons();
+      }
+
+      function renderLayerButtons() {
+        layerList.innerHTML = "";
+
+        Object.entries(layerConfigs).forEach(function ([key, config]) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "layer-item-btn" + (key === currentBaseLayerKey ? " active" : "");
+          button.textContent = config.label;
+
+          button.addEventListener("click", function () {
+            setBaseLayer(key);
+            layerMenu.classList.remove("open");
+          });
+
+          layerList.appendChild(button);
+        });
+      }
+
+      setBaseLayer(currentBaseLayerKey);
+
+      const drawControl = new L.Control.Draw({
+        position: "topleft",
+        draw: {
+          polygon: {
+            allowIntersection: false,
+            showArea: true
+          },
+          polyline: false,
+          rectangle: false,
+          circle: false,
+          circlemarker: false,
+          marker: false
+        },
+        edit: {
+          featureGroup: overlays,
+          remove: true
+        }
+      });
+
+      map.addControl(drawControl);
+
+      function getGeoJSONData() {
+        return overlays.toGeoJSON();
+      }
+
+      function refreshGeoJSONOutput() {
+        const geojson = getGeoJSONData();
+        output.textContent = JSON.stringify(geojson, null, 2);
+        return geojson;
+      }
+
+      function closeGeoJsonPopup() {
+        if (geoJsonPopup) {
+          map.closePopup(geoJsonPopup);
+          geoJsonPopup = null;
+        }
+      }
+
+      function showGeoJsonPopup() {
+        const geojson = refreshGeoJSONOutput();
+        const code = escapeHtml(JSON.stringify(geojson, null, 2));
+        const popupHtml =
+          '<div class="code-popup">' +
+          '<div class="code-popup-header">' +
+          '<h3 class="code-popup-title">GeoJSON</h3>' +
+          '<button class="code-popup-close" type="button" onclick="window.closeGeoJsonPopup()">×</button>' +
+          "</div>" +
+          '<div class="code-popup-body"><pre>' +
+          code +
+          "</pre></div>" +
+          "</div>";
+
+        closeGeoJsonPopup();
+
+        geoJsonPopup = L.popup({
+          maxWidth: 600,
+          minWidth: 320,
+          closeButton: false,
+          autoPan: true,
+          className: "geojson-popup"
+        })
+          .setLatLng(map.getCenter())
+          .setContent(popupHtml)
+          .openOn(map);
+      }
+
+      window.closeGeoJsonPopup = closeGeoJsonPopup;
+      window.getDrawnGeoJSON = function () {
+        return getGeoJSONData();
+      };
+
+      map.on(L.Draw.Event.CREATED, function (event) {
+        overlays.addLayer(event.layer);
+        refreshGeoJSONOutput();
+      });
+
+      map.on(L.Draw.Event.EDITED, function () {
+        refreshGeoJSONOutput();
+      });
+
+      map.on(L.Draw.Event.DELETED, function () {
+        refreshGeoJSONOutput();
+      });
+
+      refreshGeoJSONOutput();
+
+      function setSearchLoading(isLoading) {
+        searchBtn.disabled = isLoading;
+        searchBtnIcon.src = isLoading
+          ? "line-md--loading-twotone-loop.svg"
+          : "line-md--search.svg";
+        searchBtnIcon.classList.toggle("spinner", isLoading);
+      }
+
+      function clearResults(message) {
+        resultsList.innerHTML = "";
+        const empty = document.createElement("div");
+        empty.className = "results-empty";
+        empty.textContent = message;
+        resultsList.appendChild(empty);
+      }
+
+      function addSearchResult(item, lat, lng, marker) {
+        const title = item.title || item.Title || "بدون عنوان";
+        const address = item.address || item.Address || "-";
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "result-item";
+        button.innerHTML =
+          '<p class="result-title">' +
+          escapeHtml(title) +
+          '</p>' +
+          '<p class="result-address">' +
+          escapeHtml(address) +
+          "</p>";
+
+        button.addEventListener("click", function () {
+          map.setView([lat, lng], 16);
+          marker.openPopup();
+        });
+
+        resultsList.appendChild(button);
+      }
+
+      async function searchPlace(query) {
+        const q = String(query || "").trim();
+
+        if (!q) {
+          searchStatus.textContent = "عبارت جستجو را وارد کنید.";
+          clearResults("عبارت جستجو خالی است.");
+          return;
+        }
+
+        if (!MAPIR_API_KEY || MAPIR_API_KEY === "YOUR_MAPIR_API_KEY_HERE") {
+          searchStatus.textContent = "ابتدا MAPIR_API_KEY را در ابتدای فایل تنظیم کنید.";
+          clearResults("کلید API تنظیم نشده است.");
+          return;
+        }
+
+        setSearchLoading(true);
+        searchMarkers.clearLayers();
+        clearResults("در حال جستجو...");
+
+        try {
+          const response = await fetch(MAPIR_SEARCH_ENDPOINT, {
+            method: "POST",
+            headers: {
+              "x-api-key": MAPIR_API_KEY,
+              "content-type": "application/json"
+            },
+            body: JSON.stringify({
+              text: q
+            })
+          });
+
+          if (!response.ok) {
+            const errText = await response.text();
+            console.error("Search failed:", response.status, errText);
+            throw new Error("Search request failed with status " + response.status);
+          }
+
+          const data = await response.json();
+          const items = Array.isArray(data.value)
+            ? data.value
+            : Array.isArray(data.results)
+            ? data.results
+            : [];
+
+          if (!items.length) {
+            searchStatus.textContent = "نتیجه ای پیدا نشد.";
+            clearResults("نتیجه ای برای این جستجو پیدا نشد.");
+            return;
+          }
+
+          resultsList.innerHTML = "";
+
+          const bounds = [];
+          items.forEach(function (item) {
+            const coords =
+              item &&
+              item.geom &&
+              Array.isArray(item.geom.coordinates)
+                ? item.geom.coordinates
+                : item &&
+                  item.location &&
+                  Array.isArray(item.location.coordinates)
+                ? item.location.coordinates
+                : null;
+
+            if (!coords || coords.length < 2) {
+              return;
+            }
+
+            const lng = Number(coords[0]);
+            const lat = Number(coords[1]);
+
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+              return;
+            }
+
+            const title = item.title || item.Title || item.name || "بدون عنوان";
+            const address = item.address || item.Address || item.description || "-";
+
+            const marker = L.marker([lat, lng]).bindPopup(
+              "<strong>" + escapeHtml(title) + "</strong><br>" + escapeHtml(address)
+            );
+
+            marker.addTo(searchMarkers);
+            bounds.push([lat, lng]);
+            addSearchResult({ title: title, address: address }, lat, lng, marker);
+          });
+
+          if (!bounds.length) {
+            searchStatus.textContent = "مختصات قابل نمایش در نتایج پیدا نشد.";
+            clearResults("نتایج دریافتی مختصات معتبر ندارند.");
+            return;
+          }
+
+          if (bounds.length === 1) {
+            map.setView(bounds[0], 16);
+          } else {
+            map.fitBounds(bounds, { padding: [40, 40] });
+          }
+
+          searchStatus.textContent = bounds.length + " نتیجه پیدا شد.";
+        } catch (error) {
+          searchStatus.textContent = "خطا در جستجو. تنظیمات API یا اینترنت را بررسی کنید.";
+          clearResults("خطا در دریافت نتایج جستجو.");
+          console.error(error);
+        } finally {
+          setSearchLoading(false);
+        }
+      }
+
+      function locateUser() {
+        if (!navigator.geolocation) {
+          alert("مرورگر شما از موقعیت یابی پشتیبانی نمی کند.");
+          return;
+        }
+
+        locateBtn.disabled = true;
+
+        navigator.geolocation.getCurrentPosition(
+          function (position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const accuracy = position.coords.accuracy || 0;
+
+            if (userMarker) {
+              map.removeLayer(userMarker);
+            }
+
+            if (userCircle) {
+              map.removeLayer(userCircle);
+            }
+
+            userMarker = L.marker([lat, lng]).addTo(map);
+            userCircle = L.circle([lat, lng], {
+              radius: accuracy,
+              color: "#2563eb",
+              fillColor: "#60a5fa",
+              fillOpacity: 0.15,
+              weight: 1
+            }).addTo(map);
+
+            userMarker.bindPopup("موقعیت فعلی شما").openPopup();
+            map.setView([lat, lng], 15);
+            locateBtn.disabled = false;
+          },
+          function () {
+            alert("دریافت موقعیت مکانی ممکن نشد.");
+            locateBtn.disabled = false;
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+          }
+        );
+      }
+
+      searchBtn.addEventListener("click", function () {
+        searchPlace(searchInput.value);
+      });
+
+      searchInput.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          searchPlace(searchInput.value);
+        }
+      });
+
+      locateBtn.addEventListener("click", locateUser);
+
+      layerToggleBtn.addEventListener("click", function (event) {
+        event.stopPropagation();
+        layerMenu.classList.toggle("open");
+      });
+
+      geoCodeBtn.addEventListener("click", function () {
+        showGeoJsonPopup();
+      });
+
+      map.on("popupclose", function () {
+        geoJsonPopup = null;
+      });
+
+      document.addEventListener("click", function (event) {
+        const clickedInsideMenu = layerMenu.contains(event.target);
+        const clickedToggle = layerToggleBtn.contains(event.target);
+
+        if (!clickedInsideMenu && !clickedToggle) {
+          layerMenu.classList.remove("open");
+        }
+      });
+    </script>
+  </body>
+</html>

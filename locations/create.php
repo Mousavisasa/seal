@@ -173,4 +173,111 @@ require __DIR__ . '/../includes/header.php';
   </div>
 </div>
 
+<div class="card panel-card mt-3">
+  <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <div class="d-flex align-items-center gap-2">
+      <span class="iconify text-jade fs-5" data-icon="solar:map-point-bold"></span>
+      <span class="fw-bold">انتخاب مختصات از روی نقشه</span>
+    </div>
+    <button type="button" id="useMapCoordsBtn" class="btn btn-sm btn-soft-purple d-flex align-items-center gap-2">
+      <span class="iconify" data-icon="solar:check-circle-bold"></span> استفاده از این مختصات در فرم
+    </button>
+  </div>
+  <div class="card-body p-0">
+    <div id="mapCoordsMsg" class="alert alert-info d-flex align-items-center gap-2 m-3 mb-0 d-none">
+      <span class="iconify fs-5" data-icon="solar:info-circle-bold"></span>
+      <span id="mapCoordsMsgText"></span>
+    </div>
+    <iframe id="locationMapFrame" src="<?= BASE_URL ?>/assets_map/map.html"
+            title="نقشه انتخاب مکان"
+            style="width:100%; height:520px; border:0; border-radius:0 0 1rem 1rem;"
+            loading="lazy"></iframe>
+  </div>
+  <div class="card-footer bg-white text-muted small">
+    <span class="iconify" data-icon="solar:info-circle-bold"></span>
+    روی نقشه یک نقطه یا محدوده مشخص کنید (با ابزار رسم گوشه بالا-چپ نقشه)، سپس دکمه «استفاده از این مختصات در فرم» را بزنید تا عرض و طول جغرافیایی به‌صورت خودکار در فیلدهای بالا پر شود.
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var btn = document.getElementById('useMapCoordsBtn');
+  var frame = document.getElementById('locationMapFrame');
+  var msgBox = document.getElementById('mapCoordsMsg');
+  var msgText = document.getElementById('mapCoordsMsgText');
+  if (!btn || !frame) return;
+
+  function showMessage(text, isError) {
+    if (!msgBox || !msgText) return;
+    msgText.textContent = text;
+    msgBox.classList.remove('d-none', 'alert-info', 'alert-warning');
+    msgBox.classList.add(isError ? 'alert-warning' : 'alert-info');
+  }
+
+  /** میانگین مختصات یک آرایه از نقاط [lng, lat] برای مرکز چندضلعی */
+  function centroidOfCoordinates(coords) {
+    var sumLat = 0, sumLng = 0, count = 0;
+    coords.forEach(function (pt) {
+      if (Array.isArray(pt) && pt.length >= 2) {
+        sumLng += Number(pt[0]);
+        sumLat += Number(pt[1]);
+        count++;
+      }
+    });
+    return count > 0 ? { lat: sumLat / count, lng: sumLng / count } : null;
+  }
+
+  btn.addEventListener('click', function () {
+    var win;
+    try {
+      win = frame.contentWindow;
+    } catch (e) {
+      showMessage('دسترسی به نقشه ممکن نشد.', true);
+      return;
+    }
+
+    if (!win || typeof win.getDrawnGeoJSON !== 'function') {
+      showMessage('نقشه هنوز به‌طور کامل بارگذاری نشده است. کمی صبر کنید و دوباره تلاش کنید.', true);
+      return;
+    }
+
+    var geojson = win.getDrawnGeoJSON();
+    var features = geojson && Array.isArray(geojson.features) ? geojson.features : [];
+
+    if (!features.length) {
+      showMessage('هیچ نقطه یا محدوده‌ای روی نقشه رسم نشده است. ابتدا با ابزار رسم گوشه بالا-چپ نقشه یک نقطه یا چندضلعی مشخص کنید.', true);
+      return;
+    }
+
+    var lastFeature = features[features.length - 1];
+    var geom = lastFeature.geometry || {};
+    var lat = null, lng = null;
+
+    if (geom.type === 'Point' && Array.isArray(geom.coordinates)) {
+      lng = Number(geom.coordinates[0]);
+      lat = Number(geom.coordinates[1]);
+    } else if (geom.type === 'Polygon' && Array.isArray(geom.coordinates) && geom.coordinates[0]) {
+      var center = centroidOfCoordinates(geom.coordinates[0]);
+      if (center) { lat = center.lat; lng = center.lng; }
+    } else if (geom.type === 'LineString' && Array.isArray(geom.coordinates)) {
+      var centerLine = centroidOfCoordinates(geom.coordinates);
+      if (centerLine) { lat = centerLine.lat; lng = centerLine.lng; }
+    }
+
+    if (lat === null || lng === null || !isFinite(lat) || !isFinite(lng)) {
+      showMessage('مختصات قابل استخراج از رسم فعلی نیست.', true);
+      return;
+    }
+
+    var latInput = document.getElementById('lat');
+    var lonInput = document.getElementById('lon');
+    if (latInput) latInput.value = lat.toFixed(6);
+    if (lonInput) lonInput.value = lng.toFixed(6);
+
+    showMessage('مختصات با موفقیت در فرم قرار گرفت: ' + lat.toFixed(6) + ', ' + lng.toFixed(6), false);
+  });
+})();
+</script>
+
 <?php require __DIR__ . '/../includes/footer.php'; ?>

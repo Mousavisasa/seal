@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" serverName="myftp" uploadOnCheckin="37410dcf-67fe-4671-8c1e-747011cf969e" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" serverName="myftp" uploadOnCheckin="37410dcf-67fe-4671-8c1e-747011cf969e" remoteFilesAllowedToDisappearOnAutoupload="false" confirmBeforeUploading="false">
+    <option name="confirmBeforeUploading" value="false" />
     <serverData>
       <paths name="myftp">
         <serverdata>
