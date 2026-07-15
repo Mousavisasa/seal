@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <title>نمایش GeoJSON و مسیریابی</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Tahoma, Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            direction: rtl;
+        }
+
+        #sidebar {
+            width: 420px;
+            padding: 14px;
+            overflow-y: auto;
+            background: #f7f7f7;
+            border-left: 1px solid #ccc;
+        }
+
+        #map {
+            flex: 1;
+            height: 100vh;
+        }
+
+        textarea {
+            width: 100%;
+            height: 150px;
+            direction: ltr;
+            font-family: monospace;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+
+        input,
+        select,
+        button {
+            width: 100%;
+            padding: 9px;
+            margin: 6px 0 12px;
+            font-family: Tahoma, Arial, sans-serif;
+        }
+
+        button {
+            cursor: pointer;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+
+        button.secondary {
+            background: #388e3c;
+        }
+
+        .box {
+            background: white;
+            padding: 10px;
+            margin-bottom: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+
+        .result {
+            line-height: 1.9;
+            font-size: 14px;
+        }
+
+        .error {
+            color: #c62828;
+            font-weight: bold;
+        }
+
+        .ok {
+            color: #2e7d32;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+<div id="sidebar">
+    <h3>نمایش GeoJSON و محاسبه مسیر</h3>
+
+    <div class="box">
+        <label>GeoJSON شماره ۱</label>
+        <textarea id="geojson1">{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Polygon 1" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [51.35, 35.70],
+          [51.42, 35.70],
+          [51.42, 35.76],
+          [51.35, 35.76],
+          [51.35, 35.70]
+        ]]
+      }
+    }
+  ]
+}</textarea>
+
+        <label>GeoJSON شماره ۲</label>
+        <textarea id="geojson2">{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Polygon 2" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [51.48, 35.73],
+          [51.55, 35.73],
+          [51.55, 35.79],
+          [51.48, 35.79],
+          [51.48, 35.73]
+        ]]
+      }
+    }
+  ]
+}</textarea>
+
+        <button class="secondary" onclick="showGeojsons()">نمایش GeoJSONها و محاسبه مرکز</button>
+    </div>
+
+    <div class="box">
+        <label>API Key مپ</label>
+        <input type="text" id="apiKey" placeholder="کلید API را وارد کنید" />
+
+        <label>نوع مسیریابی</label>
+        <select id="routeType">
+            <option value="route/v1/driving">خودرو</option>
+            <option value="bicycle/v1/driving">دوچرخه</option>
+            <option value="foot/v1/driving">پیاده</option>
+        </select>
+
+        <button onclick="calculateRoute()">محاسبه مسیر بین مراکز</button>
+    </div>
+
+    <div class="box result" id="result">
+        ابتدا GeoJSONها را نمایش دهید.
+    </div>
+</div>
+
+<div id="map"></div>
+
+<script>
+    var map = L.map('map').setView([32.4279, 53.6880], 6);
+
+    // نقشه پایه از memaps.ir، نه map.ir
+    L.tileLayer('https://memaps.ir/hot/{z}/{x}/{y}.png', {
+        attribution: '© می‌مپس',
+        maxZoom: 18
+    }).addTo(map);
+
+    var geojsonLayer1 = null;
+    var geojsonLayer2 = null;
+    var centerMarker1 = null;
+    var centerMarker2 = null;
+    var routeLayer = null;
+
+    var originLngLat = null;
+    var destinationLngLat = null;
+
+    function setResult(html) {
+        document.getElementById('result').innerHTML = html;
+    }
+
+    function parseGeojson(textareaId) {
+        var raw = document.getElementById(textareaId).value.trim();
+
+        if (!raw) {
+            throw new Error('GeoJSON خالی است.');
+        }
+
+        return JSON.parse(raw);
+    }
+
+    function getCenterLngLat(geojson) {
+        var center = turf.centerOfMass(geojson);
+        return center.geometry.coordinates; // [lng, lat]
+    }
+
+    function lngLatToLatLng(lngLat) {
+        return [lngLat[1], lngLat[0]];
+    }
+
+    function formatKm(meter) {
+        if (!isFinite(meter)) return '-';
+        return (meter / 1000).toFixed(3) + ' کیلومتر';
+    }
+
+    function formatDuration(seconds) {
+        if (!isFinite(seconds)) return '-';
+
+        var minutes = Math.round(seconds / 60);
+
+        if (minutes < 60) {
+            return minutes + ' دقیقه';
+        }
+
+        var hours = Math.floor(minutes / 60);
+        var remainMinutes = minutes % 60;
+
+        return hours + ' ساعت و ' + remainMinutes + ' دقیقه';
+    }
+
+    function removeLayer(layer) {
+        if (layer) {
+            map.removeLayer(layer);
+        }
+    }
+
+    function showGeojsons() {
+        try {
+            var geojson1 = parseGeojson('geojson1');
+            var geojson2 = parseGeojson('geojson2');
+
+            removeLayer(geojsonLayer1);
+            removeLayer(geojsonLayer2);
+            removeLayer(centerMarker1);
+            removeLayer(centerMarker2);
+            removeLayer(routeLayer);
+
+            geojsonLayer1 = L.geoJSON(geojson1, {
+                style: {
+                    color: '#1565c0',
+                    weight: 3,
+                    fillOpacity: 0.25
+                }
+            }).addTo(map);
+
+            geojsonLayer2 = L.geoJSON(geojson2, {
+                style: {
+                    color: '#ef6c00',
+                    weight: 3,
+                    fillOpacity: 0.25
+                }
+            }).addTo(map);
+
+            originLngLat = getCenterLngLat(geojson1);
+            destinationLngLat = getCenterLngLat(geojson2);
+
+            centerMarker1 = L.marker(lngLatToLatLng(originLngLat), {
+                draggable: true
+            }).addTo(map).bindPopup('مرکز GeoJSON شماره ۱ / مبدا').openPopup();
+
+            centerMarker2 = L.marker(lngLatToLatLng(destinationLngLat), {
+                draggable: true
+            }).addTo(map).bindPopup('مرکز GeoJSON شماره ۲ / مقصد');
+
+            centerMarker1.on('dragend', function () {
+                var p = centerMarker1.getLatLng();
+                originLngLat = [p.lng, p.lat];
+            });
+
+            centerMarker2.on('dragend', function () {
+                var p = centerMarker2.getLatLng();
+                destinationLngLat = [p.lng, p.lat];
+            });
+
+            var group = L.featureGroup([
+                geojsonLayer1,
+                geojsonLayer2,
+                centerMarker1,
+                centerMarker2
+            ]);
+
+            map.fitBounds(group.getBounds(), {
+                padding: [30, 30]
+            });
+
+            var straightDistance = turf.distance(
+                turf.point(originLngLat),
+                turf.point(destinationLngLat),
+                { units: 'kilometers' }
+            );
+
+            setResult(
+                '<div class="ok">GeoJSONها نمایش داده شدند.</div>' +
+                '<b>مرکز GeoJSON ۱:</b><br>' +
+                'Lng: ' + originLngLat[0].toFixed(6) + '<br>' +
+                'Lat: ' + originLngLat[1].toFixed(6) + '<br><br>' +
+                '<b>مرکز GeoJSON ۲:</b><br>' +
+                'Lng: ' + destinationLngLat[0].toFixed(6) + '<br>' +
+                'Lat: ' + destinationLngLat[1].toFixed(6) + '<br><br>' +
+                '<b>فاصله مستقیم دو مرکز:</b><br>' +
+                straightDistance.toFixed(3) + ' کیلومتر'
+            );
+        } catch (error) {
+            setResult('<div class="error">خطا در خواندن GeoJSON: ' + error.message + '</div>');
+        }
+    }
+
+    async function calculateRoute() {
+        try {
+            var apiKey = document.getElementById('apiKey').value.trim();
+            var routeType = document.getElementById('routeType').value;
+
+            if (!apiKey) {
+                alert('لطفا API Key را وارد کنید.');
+                return;
+            }
+
+            if (!originLngLat || !destinationLngLat) {
+                alert('ابتدا GeoJSONها را نمایش دهید تا مرکز مبدا و مقصد مشخص شود.');
+                return;
+            }
+
+            var coordinates =
+                originLngLat[0] + ',' + originLngLat[1] + ';' +
+                destinationLngLat[0] + ',' + destinationLngLat[1];
+
+            var url =
+                'https://map.ir/routes/' +
+                routeType +
+                '/' +
+                encodeURIComponent(coordinates) +
+                '?geometries=geojson&overview=full&steps=false&alternatives=false';
+
+            setResult('در حال دریافت مسیر...');
+
+            var response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'x-api-key': apiKey
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('خطای API: ' + response.status + ' ' + response.statusText);
+            }
+
+            var data = await response.json();
+
+            if (!data.routes || !data.routes.length) {
+                throw new Error('مسیری در پاسخ API پیدا نشد.');
+            }
+
+            var route = data.routes[0];
+
+            removeLayer(routeLayer);
+
+            routeLayer = L.geoJSON(route.geometry, {
+                style: {
+                    color: '#d50000',
+                    weight: 5,
+                    opacity: 0.9
+                }
+            }).addTo(map);
+
+            map.fitBounds(routeLayer.getBounds(), {
+                padding: [35, 35]
+            });
+
+            var apiDistanceMeter = route.distance;
+            var apiDurationSecond = route.duration;
+
+            // طول مسیر از روی Geometry برگشتی نیز جداگانه محاسبه می‌شود.
+            var turfLengthKm = turf.length(route.geometry, {
+                units: 'kilometers'
+            });
+
+            setResult(
+                '<div class="ok">مسیر با موفقیت محاسبه شد.</div>' +
+                '<b>طول مسیر طبق API:</b><br>' +
+                formatKm(apiDistanceMeter) + '<br><br>' +
+                '<b>طول مسیر محاسبه‌شده از روی GeoJSON مسیر:</b><br>' +
+                turfLengthKm.toFixed(3) + ' کیلومتر<br><br>' +
+                '<b>زمان تقریبی مسیر:</b><br>' +
+                formatDuration(apiDurationSecond) + '<br><br>' +
+                '<b>مختصات مبدا:</b><br>' +
+                originLngLat[0].toFixed(6) + ', ' + originLngLat[1].toFixed(6) + '<br><br>' +
+                '<b>مختصات مقصد:</b><br>' +
+                destinationLngLat[0].toFixed(6) + ', ' + destinationLngLat[1].toFixed(6)
+            );
+        } catch (error) {
+            setResult('<div class="error">خطا در محاسبه مسیر: ' + error.message + '</div>');
+        }
+    }
+
+    showGeojsons();
+</script>
+</body>
+</html>

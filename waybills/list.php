@@ -158,7 +158,19 @@ require __DIR__ . '/../includes/header.php';
             <td><span class="status-badge <?= e($statusClassMap[$w['send_status']] ?? '') ?>"><?= e($w['send_status']) ?></span></td>
             <td class="ltr-text"><?= $w['attached_seal_id'] ? e($w['attached_seal_id']) : '<span class="text-muted">—</span>' ?></td>
             <td><?= $w['origin_operator_first'] ? e($w['origin_operator_first'] . ' ' . $w['origin_operator_last']) : '<span class="text-muted">—</span>' ?></td>
-            <td><?= $w['dest_operator_first'] ? e($w['dest_operator_first'] . ' ' . $w['dest_operator_last']) : '<span class="text-muted">—</span>' ?></td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <span><?= $w['dest_operator_first'] ? e($w['dest_operator_first'] . ' ' . $w['dest_operator_last']) : '<span class="text-muted">—</span>' ?></span>
+                <?php if (can_assign_operator()): ?>
+                  <a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1"
+                     href="<?= BASE_URL ?>/waybills/assign_operator.php?id=<?= e((string)$w['id']) ?>&amp;side=destination"
+                     data-bs-toggle="tooltip" title="تخصیص یا تغییر متصدی مقصد">
+                    <span class="iconify" data-icon="<?= $w['dest_operator_first'] ? 'solar:pen-bold' : 'solar:add-circle-bold' ?>"></span>
+                    <?= $w['dest_operator_first'] ? 'تغییر' : 'تخصیص' ?>
+                  </a>
+                <?php endif; ?>
+              </div>
+            </td>
             <td><?= $w['driver_first'] ? e($w['driver_first'] . ' ' . $w['driver_last']) : '<span class="text-muted">—</span>' ?></td>
             <td class="text-start">
               <div class="d-flex gap-1 justify-content-start flex-wrap">

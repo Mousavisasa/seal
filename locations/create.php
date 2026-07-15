@@ -47,8 +47,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!is_numeric($lon) || (float)$lon < -180 || (float)$lon > 180) {
             $errors[] = 'مقدار طول جغرافیایی (lon) معتبر نیست.';
         }
-        if ($old['geojson'] !== '' && json_decode($old['geojson']) === null) {
-            $errors[] = 'داده GeoJSON معتبر نیست.';
+        if ($old['geojson'] === '') {
+            $errors[] = 'تعیین محدوده جغرافیایی (Geofence) روی نقشه الزامی است.';
+        } elseif (json_decode($old['geojson']) === null) {
+            $errors[] = 'داده محدوده جغرافیایی (Geofence) معتبر نیست.';
         }
 
         if (!$errors) {
@@ -120,51 +122,108 @@ require __DIR__ . '/../includes/header.php';
     <form method="post" action="<?= BASE_URL ?>/locations/create.php" novalidate>
       <?= csrf_field() ?>
       <input type="hidden" id="geojson" name="geojson" value="<?= e($old['geojson']) ?>">
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label" for="location_code">کد مکان</label>
-          <div class="input-group">
-            <span class="input-group-text"><span class="iconify" data-icon="solar:hashtag-square-bold"></span></span>
-            <input type="text" class="form-control ltr-text" id="location_code" name="location_code" required maxlength="10"
-                   value="<?= e($old['location_code']) ?>" placeholder="مثلاً LOC-005">
+
+      <!-- کلاستر ۱: اطلاعات عمومی -->
+      <div class="form-section">
+        <div class="form-section-head">
+          <span class="form-section-icon"><span class="iconify" data-icon="solar:info-square-bold"></span></span>
+          <div>
+            <div class="form-section-title">
+              اطلاعات عمومی
+              <span class="iconify form-section-hint" data-icon="solar:question-circle-bold" tabindex="0"
+                    data-bs-toggle="tooltip" data-bs-placement="top"
+                    title="نام نمایشی مکان و کد یکتای آن. کد مکان پس از ثبت قابل تغییر نیست و در بارنامه‌ها استفاده می‌شود."></span>
+            </div>
+            <div class="form-section-sub">نام و شناسه مکان</div>
           </div>
         </div>
-        <div class="col-md-6">
-          <label class="form-label" for="region_id">منطقه</label>
-          <div class="input-group">
-            <span class="input-group-text"><span class="iconify" data-icon="solar:map-point-bold"></span></span>
-            <select class="form-select" id="region_id" name="region_id" required>
-              <option value="">— انتخاب کنید —</option>
-              <?php foreach ($regions as $r): ?>
-                <option value="<?= e((string)$r['region_code']) ?>" <?= (string)$r['region_code'] === $old['region_id'] ? 'selected' : '' ?>>
-                  <?= e($r['region_name']) ?> (<?= e((string)$r['region_code']) ?>)
-                </option>
-              <?php endforeach; ?>
-            </select>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="title">عنوان مکان <span class="req-mark">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text"><span class="iconify" data-icon="solar:signpost-bold"></span></span>
+              <input type="text" class="form-control" id="title" name="title" required minlength="2"
+                     value="<?= e($old['title']) ?>" placeholder="مثلاً انبار نفت مرکزی">
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="location_code">کد مکان (شناسه) <span class="req-mark">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text"><span class="iconify" data-icon="solar:hashtag-square-bold"></span></span>
+              <input type="text" class="form-control ltr-text" id="location_code" name="location_code" required maxlength="10"
+                     value="<?= e($old['location_code']) ?>" placeholder="مثلاً LOC-005">
+            </div>
           </div>
         </div>
-        <div class="col-md-6">
-          <label class="form-label" for="title">عنوان مکان</label>
-          <div class="input-group">
-            <span class="input-group-text"><span class="iconify" data-icon="solar:signpost-bold"></span></span>
-            <input type="text" class="form-control" id="title" name="title" required minlength="2"
-                   value="<?= e($old['title']) ?>" placeholder="مثلاً انبار نفت مرکزی">
+      </div>
+
+      <!-- کلاستر ۲: جزئیات موقعیت -->
+      <div class="form-section">
+        <div class="form-section-head">
+          <span class="form-section-icon"><span class="iconify" data-icon="solar:map-point-bold"></span></span>
+          <div>
+            <div class="form-section-title">
+              جزئیات موقعیت
+              <span class="iconify form-section-hint" data-icon="solar:question-circle-bold" tabindex="0"
+                    data-bs-toggle="tooltip" data-bs-placement="top"
+                    title="منطقه سازمانی مکان را انتخاب کنید، سپس محدوده جغرافیایی را روی نقشه رسم و ثبت کنید. مختصات lat/lon به‌صورت خودکار از محدوده محاسبه می‌شود."></span>
+            </div>
+            <div class="form-section-sub">منطقه و محدوده جغرافیایی روی نقشه</div>
           </div>
         </div>
-        <div class="col-md-3">
-          <label class="form-label" for="lat">عرض جغرافیایی (lat) <span class="text-muted small">(اختیاری)</span></label>
-          <div class="input-group">
-            <span class="input-group-text"><span class="iconify" data-icon="solar:global-bold"></span></span>
-            <input type="text" class="form-control ltr-text" id="lat" name="lat"
-                   value="<?= e($old['lat']) ?>" placeholder="مثلاً 35.6892">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="region_id">منطقه <span class="req-mark">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text"><span class="iconify" data-icon="solar:map-point-bold"></span></span>
+              <select class="form-select" id="region_id" name="region_id" required>
+                <option value="">— انتخاب کنید —</option>
+                <?php foreach ($regions as $r): ?>
+                  <option value="<?= e((string)$r['region_code']) ?>" <?= (string)$r['region_code'] === $old['region_id'] ? 'selected' : '' ?>>
+                    <?= e($r['region_name']) ?> (<?= e((string)$r['region_code']) ?>)
+                  </option>
+                <?php endforeach; ?>
+              </select>
+            </div>
           </div>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label" for="lon">طول جغرافیایی (lon) <span class="text-muted small">(اختیاری)</span></label>
-          <div class="input-group">
-            <span class="input-group-text"><span class="iconify" data-icon="solar:global-bold"></span></span>
-            <input type="text" class="form-control ltr-text" id="lon" name="lon"
-                   value="<?= e($old['lon']) ?>" placeholder="مثلاً 51.3890">
+          <div class="col-md-3">
+            <label class="form-label" for="lat">عرض جغرافیایی (lat)</label>
+            <div class="input-group">
+              <span class="input-group-text"><span class="iconify" data-icon="solar:global-bold"></span></span>
+              <input type="text" class="form-control ltr-text" id="lat" name="lat" readonly
+                     value="<?= e($old['lat']) ?>" placeholder="از نقشه">
+            </div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="lon">طول جغرافیایی (lon)</label>
+            <div class="input-group">
+              <span class="input-group-text"><span class="iconify" data-icon="solar:global-bold"></span></span>
+              <input type="text" class="form-control ltr-text" id="lon" name="lon" readonly
+                     value="<?= e($old['lon']) ?>" placeholder="از نقشه">
+            </div>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label d-flex flex-wrap align-items-center gap-2">
+              محدوده جغرافیایی (Geofence) <span class="req-mark">*</span>
+              <button type="button" id="useMapCoordsBtn" class="btn btn-sm btn-soft-purple d-flex align-items-center gap-2 ms-auto">
+                <span class="iconify" data-icon="solar:check-circle-bold"></span> ثبت محدوده رسم‌شده
+              </button>
+            </label>
+            <div id="mapCoordsMsg" class="alert alert-info d-flex align-items-center gap-2 mb-2 d-none">
+              <span class="iconify fs-5" data-icon="solar:info-circle-bold"></span>
+              <span id="mapCoordsMsgText"></span>
+            </div>
+            <div class="border rounded overflow-hidden">
+              <iframe id="locationMapFrame" src="<?= BASE_URL ?>/assets_map/map.html"
+                      title="نقشه انتخاب مکان"
+                      style="width:100%; height:480px; border:0;"
+                      loading="lazy"></iframe>
+            </div>
+            <div class="form-text">
+              <span class="iconify" data-icon="solar:info-circle-bold"></span>
+              روی نقشه یک نقطه یا محدوده مشخص کنید (با ابزار رسم گوشه بالا-چپ نقشه)، سپس دکمه «ثبت محدوده رسم‌شده» را بزنید.
+            </div>
           </div>
         </div>
       </div>
@@ -176,32 +235,6 @@ require __DIR__ . '/../includes/header.php';
         <a href="<?= BASE_URL ?>/locations/list.php" class="btn btn-outline-secondary">انصراف</a>
       </div>
     </form>
-  </div>
-</div>
-
-<div class="card panel-card mt-3">
-  <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-    <div class="d-flex align-items-center gap-2">
-      <span class="iconify text-jade fs-5" data-icon="solar:map-point-bold"></span>
-      <span class="fw-bold">انتخاب مختصات از روی نقشه</span>
-    </div>
-    <button type="button" id="useMapCoordsBtn" class="btn btn-sm btn-soft-purple d-flex align-items-center gap-2">
-      <span class="iconify" data-icon="solar:check-circle-bold"></span> استفاده از این مختصات در فرم
-    </button>
-  </div>
-  <div class="card-body p-0">
-    <div id="mapCoordsMsg" class="alert alert-info d-flex align-items-center gap-2 m-3 mb-0 d-none">
-      <span class="iconify fs-5" data-icon="solar:info-circle-bold"></span>
-      <span id="mapCoordsMsgText"></span>
-    </div>
-    <iframe id="locationMapFrame" src="<?= BASE_URL ?>/assets_map/map.html"
-            title="نقشه انتخاب مکان"
-            style="width:100%; height:520px; border:0; border-radius:0 0 1rem 1rem;"
-            loading="lazy"></iframe>
-  </div>
-  <div class="card-footer bg-white text-muted small">
-    <span class="iconify" data-icon="solar:info-circle-bold"></span>
-    روی نقشه یک نقطه یا محدوده مشخص کنید (با ابزار رسم گوشه بالا-چپ نقشه)، سپس دکمه «استفاده از این مختصات در فرم» را بزنید تا عرض و طول جغرافیایی به‌صورت خودکار در فیلدهای بالا پر شود.
   </div>
 </div>
 

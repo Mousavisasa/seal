@@ -1,6 +1,6 @@
 <?php
 /**
- * تخصیص راننده حمل‌کننده به بارنامه
+ * تخصیص راننده به بارنامه
  * دسترسی: ادمین (همه بارنامه‌ها) یا کاربر متصدی که به‌عنوان متصدی مبدا یا مقصد
  * همین بارنامه تخصیص یافته است.
  */
@@ -91,7 +91,7 @@ require __DIR__ . '/../includes/header.php';
 ?>
 
 <div class="mb-4">
-  <h1 class="h4 fw-bold mb-1">تخصیص راننده حمل‌کننده</h1>
+  <h1 class="h4 fw-bold mb-1">تخصیص راننده</h1>
   <p class="text-muted small mb-0">راننده مسئول حمل این بارنامه را انتخاب کنید.</p>
 </div>
 
@@ -124,7 +124,7 @@ require __DIR__ . '/../includes/header.php';
           <?= csrf_field() ?>
           <input type="hidden" name="id" value="<?= e((string)$waybill['id']) ?>">
 
-          <label class="form-label" for="driver_user_id">کد راننده حمل‌کننده</label>
+          <label class="form-label" for="driver_user_id">کد راننده</label>
           <div class="input-group mb-3">
             <span class="input-group-text"><span class="iconify" data-icon="solar:bus-bold"></span></span>
             <select class="form-select" id="driver_user_id" name="driver_user_id">

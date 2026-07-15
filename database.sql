@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS `locations` (
 -- کد منطقه مبدا/مقصد از طریق origin_location_id / destination_location_id → locations.region_id
 -- به‌دست می‌آید و نیازی به ستون جداگانه در این جدول نیست.
 -- بارنامه دو متصدی دارد: متصدی مبدا و متصدی مقصد (هر دو اختیاری، NULL مجاز).
--- انتخاب راننده حمل‌کننده هم اختیاری است.
+-- انتخاب راننده هم اختیاری است.
 CREATE TABLE IF NOT EXISTS `fuel_waybills` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `origin_location_id` INT UNSIGNED NOT NULL,

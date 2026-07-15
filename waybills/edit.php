@@ -326,11 +326,25 @@ require __DIR__ . '/../includes/header.php';
 <div class="card panel-card mt-3">
   <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
     <div>
-      <div class="fw-bold">تخصیص راننده حمل‌کننده</div>
+      <div class="fw-bold">تخصیص راننده</div>
       <div class="text-muted small">تعیین راننده مسئول حمل این بارنامه</div>
     </div>
     <a href="<?= BASE_URL ?>/waybills/assign_driver.php?id=<?= e((string)$waybill['id']) ?>" class="btn btn-soft-purple d-flex align-items-center gap-2">
       <span class="iconify" data-icon="solar:bus-bold"></span> تخصیص راننده
+    </a>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php if (can_attach_seal_to_waybill()): ?>
+<div class="card panel-card mt-3">
+  <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <div>
+      <div class="fw-bold">تخصیص پلمپ</div>
+      <div class="text-muted small">الصاق یا تغییر پلمپ این بارنامه</div>
+    </div>
+    <a href="<?= BASE_URL ?>/waybills/assign_seal.php?id=<?= e((string)$waybill['id']) ?>" class="btn btn-soft-purple d-flex align-items-center gap-2">
+      <span class="iconify" data-icon="solar:lock-password-unlocked-bold"></span> تخصیص پلمپ
     </a>
   </div>
 </div>

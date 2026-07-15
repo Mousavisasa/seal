@@ -84,6 +84,58 @@ body { background: var(--surface); color: var(--ink); }
 .toggle-pass { cursor: pointer; user-select: none; }
 .form-label { font-weight: 600; font-size: .9rem; }
 .invalid-feedback { min-height: 1rem; }
+.req-mark { color: #b02a37; font-weight: 700; margin-inline-start: .15rem; }
+
+/* ---------- بخش‌بندی فرم‌ها (کلاسترها) ---------- */
+.form-section {
+  border: 1px solid #e6ece9;
+  border-radius: var(--card-radius);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdfc 100%);
+  padding: 1.1rem 1.25rem 1.35rem;
+  margin-bottom: 1.1rem;
+}
+.form-section:last-of-type { margin-bottom: 0; }
+.form-section-head {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  padding-bottom: .9rem;
+  margin-bottom: 1.1rem;
+  border-bottom: 1px dashed #e2e9e6;
+}
+.form-section-icon {
+  width: 40px; height: 40px;
+  display: grid; place-items: center;
+  border-radius: .7rem;
+  background: var(--purple-soft);
+  color: var(--purple-dark);
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+.form-section-title { font-weight: 700; font-size: .98rem; line-height: 1.2; }
+.form-section-hint {
+  color: var(--dim);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: help;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin-inline-start: .35rem;
+  vertical-align: -2px;
+}
+.form-section-hint:hover, .form-section-hint:focus { color: var(--purple-dark); }
+.form-section-sub { color: var(--dim); font-size: .8rem; margin-top: .15rem; }
+.form-section-badge {
+  margin-inline-start: auto;
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--dim);
+  background: #f0f4f2;
+  border-radius: 2rem;
+  padding: .25rem .7rem;
+  white-space: nowrap;
+}
 
 /* ---------- صفحه ورود ---------- */
 .auth-body {

@@ -25,6 +25,13 @@
   }
   if (backdrop) backdrop.addEventListener('click', closeSidebar);
 
+  /* ---------- راهنمای ابزار (Tooltip) بخش‌های فرم ---------- */
+  if (window.bootstrap && typeof window.bootstrap.Tooltip === 'function') {
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+      new window.bootstrap.Tooltip(el);
+    });
+  }
+
   /* ---------- نمایش/مخفی‌کردن رمز ---------- */
   document.querySelectorAll('.toggle-pass').forEach(function (btn) {
     btn.addEventListener('click', function () {
