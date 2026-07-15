@@ -41,15 +41,28 @@ body { background: var(--surface); color: var(--ink); }
   font-weight: 600;
 }
 .btn-soft-purple {
-  background: var(--purple-soft);
-  color: var(--purple-dark);
-  border: 1px solid transparent;
-  border-radius: .55rem;
+  background: var(--purple);
+  color: #fff;
+  border: 1px solid var(--purple);
+  border-radius: .65rem;
   font-weight: 600;
 }
-.btn-soft-purple:hover { background: var(--purple); color: #fff; }
+.btn-soft-purple:hover {
+  background: var(--purple-dark);
+  border-color: var(--purple-dark);
+  color: #fff;
+}
 .btn-outline-secondary { border-radius: .65rem; }
+.btn-outline-danger { border-radius: .65rem; font-weight: 600; }
 .btn-icon { border: 0; background: transparent; color: var(--ink); }
+
+/* دکمه‌های کوچک (مثلاً در جدول‌ها) با شعاع گردی متناسب و هماهنگ */
+.btn-sm.btn-soft-purple,
+.btn-sm.btn-outline-danger,
+.btn-sm.btn-outline-secondary,
+.btn-sm.btn-primary {
+  border-radius: .5rem;
+}
 
 /* ---------- فرم‌ها ---------- */
 .form-control, .form-select {
