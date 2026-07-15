@@ -124,6 +124,7 @@ function current_user_is_active(): bool
 /** محافظ صفحات ادمین: در صورت نبود دسترسی، هدایت به صفحه ورود */
 function require_admin(): void
 {
+
     if (!is_admin()) {
         set_flash('warning', 'برای دسترسی به این بخش ابتدا وارد شوید.');
         header('Location: ' . BASE_URL . '/login.php');
