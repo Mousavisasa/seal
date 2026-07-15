@@ -15,6 +15,10 @@
           <mappings>
             <mapping deploy="/" local="$PROJECT_DIR$" web="/" />
           </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/.claude" />
+            <excludedPath local="true" path="$PROJECT_DIR$/.git" />
+          </excludedPaths>
         </serverdata>
       </paths>
     </serverData>
