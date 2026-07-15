@@ -37,7 +37,7 @@ $canAttachSeal = can_attach_seal_to_waybill();
 
 try {
     $locations = db()->query(
-        'SELECT l.id, l.location_code, l.title, l.region_id, r.region_name
+        'SELECT l.id, l.location_code, l.title, l.region_id, l.lat, l.lon, r.region_name
          FROM locations l INNER JOIN regions r ON r.region_code = l.region_id
          ORDER BY l.title'
     )->fetchAll();
@@ -318,6 +318,8 @@ require __DIR__ . '/../includes/header.php';
                 <?php foreach ($locations as $l): ?>
                   <option value="<?= e((string)$l['id']) ?>"
                           data-region="<?= e((string)$l['region_id']) ?>"
+                          data-lat="<?= e((string)$l['lat']) ?>"
+                          data-lon="<?= e((string)$l['lon']) ?>"
                           <?= (string)$l['id'] === $old['origin_location_id'] ? 'selected' : '' ?>>
                     <?= e($l['title']) ?> (<?= e($l['location_code']) ?>) — <?= e($l['region_name']) ?>
                   </option>
@@ -334,6 +336,8 @@ require __DIR__ . '/../includes/header.php';
                 <?php foreach ($locations as $l): ?>
                   <option value="<?= e((string)$l['id']) ?>"
                           data-region="<?= e((string)$l['region_id']) ?>"
+                          data-lat="<?= e((string)$l['lat']) ?>"
+                          data-lon="<?= e((string)$l['lon']) ?>"
                           <?= (string)$l['id'] === $old['destination_location_id'] ? 'selected' : '' ?>>
                     <?= e($l['title']) ?> (<?= e($l['location_code']) ?>) — <?= e($l['region_name']) ?>
                   </option>

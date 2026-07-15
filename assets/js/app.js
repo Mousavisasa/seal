@@ -472,3 +472,80 @@ document.addEventListener('visibilitychange', function () {
     });
   }
 });
+
+/* ---------- محاسبه خودکار مسافت بین مبدا و مقصد (فرم بارنامه) ---------- */
+/* الگوریتم مطابق distance_calc/distance_calculator.html:
+   ۱) تلاش برای مسیر جاده‌ای واقعی از API نقشه (map.ir routing)
+   ۲) در صورت شکست، فاصله مستقیم هوایی با فرمول هاورساین (معادل turf.distance) به‌عنوان جایگزین
+   فیلد مسافت دستی باقی می‌ماند و کاربر می‌تواند مقدار محاسبه‌شده را ویرایش کند. */
+(function () {
+  'use strict';
+
+  var originSelect = document.getElementById('origin_location_id');
+  var destSelect = document.getElementById('destination_location_id');
+  var distanceInput = document.getElementById('distance_km');
+  if (!originSelect || !destSelect || !distanceInput) return;
+
+  var MAPIR_API_KEY = window.MAPIR_API_KEY || '';
+
+  function getCoords(select) {
+    var opt = select.options[select.selectedIndex];
+    if (!opt || !opt.value) return null;
+    var lat = parseFloat(opt.getAttribute('data-lat'));
+    var lon = parseFloat(opt.getAttribute('data-lon'));
+    if (!isFinite(lat) || !isFinite(lon) || (lat === 0 && lon === 0)) return null;
+    return { lat: lat, lon: lon };
+  }
+
+  function haversineKm(a, b) {
+    var R = 6371;
+    var dLat = (b.lat - a.lat) * Math.PI / 180;
+    var dLon = (b.lon - a.lon) * Math.PI / 180;
+    var lat1 = a.lat * Math.PI / 180;
+    var lat2 = b.lat * Math.PI / 180;
+    var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  }
+
+  var hint = document.createElement('div');
+  hint.className = 'form-text';
+  hint.id = 'distanceAutoHint';
+  var distanceCol = distanceInput.closest('.col-md-6') || distanceInput.parentElement;
+  distanceCol.appendChild(hint);
+
+  function setHint(text, isWarn) {
+    hint.textContent = text;
+    hint.classList.toggle('text-warning', Boolean(isWarn));
+  }
+
+  async function autoFillDistance() {
+    var origin = getCoords(originSelect);
+    var destination = getCoords(destSelect);
+    if (!origin || !destination) return;
+
+    setHint('در حال محاسبه خودکار مسافت...');
+
+    try {
+      if (!MAPIR_API_KEY) throw new Error('no api key');
+      var coordinates = origin.lon + ',' + origin.lat + ';' + destination.lon + ',' + destination.lat;
+      var url = 'https://map.ir/routes/route/v1/driving/' + encodeURIComponent(coordinates) +
+                 '?geometries=geojson&overview=false&steps=false&alternatives=false';
+      var response = await fetch(url, { headers: { 'x-api-key': MAPIR_API_KEY } });
+      if (!response.ok) throw new Error('bad status');
+      var data = await response.json();
+      if (!data.routes || !data.routes.length) throw new Error('no route');
+
+      var km = data.routes[0].distance / 1000;
+      distanceInput.value = km.toFixed(2);
+      setHint('مسافت به‌صورت خودکار از مسیر جاده‌ای محاسبه شد (' + km.toFixed(2) + ' کیلومتر). در صورت نیاز می‌توانید آن را ویرایش کنید.', false);
+    } catch (e) {
+      var straightKm = haversineKm(origin, destination);
+      distanceInput.value = straightKm.toFixed(2);
+      setHint('مسیر جاده‌ای در دسترس نبود؛ فاصله مستقیم هوایی محاسبه شد (' + straightKm.toFixed(2) + ' کیلومتر). در صورت نیاز می‌توانید آن را ویرایش کنید.', true);
+    }
+  }
+
+  originSelect.addEventListener('change', autoFillDistance);
+  destSelect.addEventListener('change', autoFillDistance);
+})();

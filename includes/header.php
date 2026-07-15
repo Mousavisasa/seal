@@ -19,6 +19,7 @@ $active = $active ?? '';
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
 <script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script>window.MAPIR_API_KEY = <?= json_encode(MAPIR_API_KEY) ?>;</script>
 </head>
 <body class="panel-body">
 
