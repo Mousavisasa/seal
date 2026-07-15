@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS `locations` (
   `title` VARCHAR(150) NOT NULL,
   `lat` FLOAT NOT NULL DEFAULT 0,
   `lon` FLOAT NOT NULL DEFAULT 0,
+  `geojson` TEXT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_location_code` (`location_code`),
   KEY `idx_location_title` (`title`),

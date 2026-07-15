@@ -9,7 +9,7 @@ require_once __DIR__ . '/../helpers/auth.php';
 require_waybill_access();
 
 $errors = [];
-$old = ['location_code' => '', 'region_id' => '', 'title' => '', 'lat' => '', 'lon' => ''];
+$old = ['location_code' => '', 'region_id' => '', 'title' => '', 'lat' => '', 'lon' => '', 'geojson' => ''];
 $regions = [];
 
 try {
@@ -27,6 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $old['title']         = trim((string)($_POST['title'] ?? ''));
         $old['lat']           = trim((string)($_POST['lat'] ?? ''));
         $old['lon']           = trim((string)($_POST['lon'] ?? ''));
+        $old['geojson']       = trim((string)($_POST['geojson'] ?? ''));
 
         if ($old['location_code'] === '' || mb_strlen($old['location_code']) > 10) {
             $errors[] = 'کد مکان الزامی است و باید حداکثر ۱۰ کاراکتر باشد.';
@@ -45,6 +46,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (!is_numeric($lon) || (float)$lon < -180 || (float)$lon > 180) {
             $errors[] = 'مقدار طول جغرافیایی (lon) معتبر نیست.';
+        }
+        if ($old['geojson'] !== '' && json_decode($old['geojson']) === null) {
+            $errors[] = 'داده GeoJSON معتبر نیست.';
         }
 
         if (!$errors) {
@@ -68,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $errors[] = 'مکانی با این کد قبلاً ثبت شده است.';
                 } else {
                     $stmt = db()->prepare(
-                        'INSERT INTO locations (location_code, region_id, title, lat, lon) VALUES (?, ?, ?, ?, ?)'
+                        'INSERT INTO locations (location_code, region_id, title, lat, lon, geojson) VALUES (?, ?, ?, ?, ?, ?)'
                     );
                     $stmt->execute([
                         $old['location_code'],
@@ -76,6 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $old['title'],
                         (float)$lat,
                         (float)$lon,
+                        $old['geojson'] !== '' ? $old['geojson'] : null,
                     ]);
                     set_flash('success', 'مکان «' . $old['title'] . '» با موفقیت ایجاد شد.');
                     header('Location: ' . BASE_URL . '/locations/list.php');
@@ -114,6 +119,7 @@ require __DIR__ . '/../includes/header.php';
   <div class="card-body p-4">
     <form method="post" action="<?= BASE_URL ?>/locations/create.php" novalidate>
       <?= csrf_field() ?>
+      <input type="hidden" id="geojson" name="geojson" value="<?= e($old['geojson']) ?>">
       <div class="row g-3">
         <div class="col-md-6">
           <label class="form-label" for="location_code">کد مکان</label>
@@ -272,8 +278,10 @@ require __DIR__ . '/../includes/header.php';
 
     var latInput = document.getElementById('lat');
     var lonInput = document.getElementById('lon');
+    var geojsonInput = document.getElementById('geojson');
     if (latInput) latInput.value = lat.toFixed(6);
     if (lonInput) lonInput.value = lng.toFixed(6);
+    if (geojsonInput) geojsonInput.value = JSON.stringify(geojson);
 
     showMessage('مختصات با موفقیت در فرم قرار گرفت: ' + lat.toFixed(6) + ', ' + lng.toFixed(6), false);
   });

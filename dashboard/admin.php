@@ -124,49 +124,6 @@ require __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="row g-3 mb-4">
-  <div class="col-md-3">
-    <a href="<?= BASE_URL ?>/regions/list.php" class="text-decoration-none">
-      <div class="card panel-card h-100">
-        <div class="card-body d-flex align-items-center gap-3">
-          <span class="stat-icon" style="background: var(--purple-soft); color: var(--purple-dark);"><span class="iconify" data-icon="solar:map-point-bold"></span></span>
-          <div><div class="fw-bold small">مدیریت مناطق</div></div>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col-md-3">
-    <a href="<?= BASE_URL ?>/locations/list.php" class="text-decoration-none">
-      <div class="card panel-card h-100">
-        <div class="card-body d-flex align-items-center gap-3">
-          <span class="stat-icon" style="background: var(--jade-soft); color: var(--jade-dark);"><span class="iconify" data-icon="solar:signpost-bold"></span></span>
-          <div><div class="fw-bold small">مبادی و مقاصد</div></div>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col-md-3">
-    <a href="<?= BASE_URL ?>/waybills/list.php" class="text-decoration-none">
-      <div class="card panel-card h-100">
-        <div class="card-body d-flex align-items-center gap-3">
-          <span class="stat-icon" style="background: var(--purple-soft); color: var(--purple-dark);"><span class="iconify" data-icon="solar:fuel-bold"></span></span>
-          <div><div class="fw-bold small">بارنامه سوخت</div></div>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col-md-3">
-    <a href="<?= BASE_URL ?>/seals/list.php" class="text-decoration-none">
-      <div class="card panel-card h-100">
-        <div class="card-body d-flex align-items-center gap-3">
-          <span class="stat-icon" style="background: var(--jade-soft); color: var(--jade-dark);"><span class="iconify" data-icon="solar:shield-keyhole-bold"></span></span>
-          <div><div class="fw-bold small">انبارداری پلمپ</div></div>
-        </div>
-      </div>
-    </a>
-  </div>
-</div>
-
-<div class="row g-3 mb-4">
   <div class="col-lg-6">
     <?php
     render_chart_card_with_table(

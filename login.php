@@ -65,7 +65,7 @@ $flash = get_flash();
   <div class="auth-side d-none d-md-flex">
     <span class="iconify auth-side-icon" data-icon="solar:shield-user-bold-duotone"></span>
     <h2 class="fw-bold text-white mt-3"><?= e(APP_NAME) ?></h2>
-    <p class="text-white-50 mb-0">مدیریت راننده‌ها، متصدی‌ها و مناطق در یک پنل ساده و امن</p>
+    <p class="text-white-50 mb-0">رویداد دانش آموزی کی برد، محور اینترنت اشیاء،علی ضیایی</p>
   </div>
   <div class="auth-form p-4 p-md-5">
     <h1 class="h4 fw-bold mb-1">ورود به پنل مدیریت</h1>
