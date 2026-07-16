@@ -82,6 +82,11 @@ $active = $active ?? '';
           <span class="iconify" data-icon="solar:fuel-bold"></span> مدیریت بارنامه سوخت
         </a>
       </li>
+      <li>
+        <a href="<?= BASE_URL ?>/map/index.php" class="<?= $active === 'map' ? 'active' : '' ?>">
+          <span class="iconify" data-icon="solar:map-bold-duotone"></span> بررسی حصار جغرافیایی
+        </a>
+      </li>
       <?php endif; ?>
 
       <?php if (is_admin() || is_region()): ?>
