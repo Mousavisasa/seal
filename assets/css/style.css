@@ -347,9 +347,10 @@ body { background: var(--surface); color: var(--ink); }
 .code-block {
   position: relative;
   margin-bottom: 1rem;
-  background: #1e1b32;
-  border-radius: .8rem;
-  border-inline-start: 4px solid var(--jade);
+  background: #1e1e2e;
+  border-radius: 10px;
+  border: 1px solid #313244;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
   overflow: hidden;
 }
 .code-block-toolbar {
@@ -357,44 +358,53 @@ body { background: var(--surface); color: var(--ink); }
   align-items: center;
   justify-content: space-between;
   gap: .5rem;
-  background: transparent;
-  color: #9a93b8;
-  padding: .55rem 1.1rem;
-  font-size: .78rem;
+  background: #181825;
+  color: #cdd6f4;
+  padding: 8px 14px;
+  font-size: 13px;
   font-family: 'Consolas', 'Courier New', monospace;
   direction: ltr;
-  border-bottom: 1px solid rgba(255, 255, 255, .1);
 }
 .code-block-lang {
   font-weight: 700;
   letter-spacing: .04em;
-  text-transform: uppercase;
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 .code-block-copy-btn {
   display: inline-flex;
   align-items: center;
-  gap: .3rem;
-  background: none;
+  gap: 6px;
+  background: transparent;
   border: none;
-  color: inherit;
-  padding: 0;
-  font-size: .78rem;
+  color: #cdd6f4;
+  padding: 4px 8px;
+  font-size: 13px;
   line-height: 1.4;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: color .15s ease;
+  transition: background .2s;
 }
-.code-block-copy-btn:hover { color: #fff; }
-.code-block-copy-btn.copied { color: var(--jade); }
+.code-block-copy-btn:hover { background: #313244; }
+.code-block-copy-btn.copied { color: #a6e3a1; }
+.code-block-copy-icon { display: inline-flex; }
+.code-block-copy-icon svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
 .code-block .api-doc-code,
 .code-block .api-response {
   background: transparent;
   border-radius: 0;
   border-inline-start: none;
   margin: 0;
+  padding: 16px;
+}
+/* Prism نباید پس‌زمینه/حاشیه خودش را روی کادرهای ما اعمال کند */
+.code-block pre[class*="language-"],
+.code-block code[class*="language-"] {
+  background: transparent;
+  text-shadow: none;
+  font-family: 'Consolas', 'Courier New', monospace;
 }
 
 /* ---------- ماژول بارنامه سوخت ---------- */

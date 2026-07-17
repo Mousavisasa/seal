@@ -4,7 +4,7 @@
  * شامل سه زیرصفحه که از بالای صفحه قابل انتخاب هستند:
  *  ۱) وب‌سرویس ورود (api/login.php)
  *  ۲) وب‌سرویس شروع/پایان سفر (api/trip_action.php)
- *  ۳) وب‌سرویس بارنامه فعال (api/active_waybill.php)
+ *  ۳) وب‌سرویس بارنامه ی انتخاب شده (api/active_waybill.php)
  */
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/helpers/auth.php';
@@ -34,16 +34,21 @@ try {
     error_log('api_test waybills fetch error: ' . $e->getMessage());
 }
 
-// رانندگانی که همین الان یک بارنامه فعال («ارسال شده») دارند — برای تست زنده
-// وب‌سرویس بارنامه فعال؛ همان بارنامه‌های $endableWaybills هستند (چون «فعال»
-// دقیقاً یعنی وضعیت «ارسال شده»)، فقط بدون تکرار راننده
+// رانندگانی که همین الان یک بارنامه ی انتخاب شده دارند (تریگر داخلی
+// users.selected_waybill_id که با کلیک روی «شروع سفر» ست می‌شود) — برای تست زنده
+// وب‌سرویس بارنامه ی انتخاب شده؛ مستقل از send_status بارنامه
 $activeDrivers = [];
-$seenDriverIds = [];
-foreach ($endableWaybills as $row) {
-    if (!in_array((int)$row['driver_user_id'], $seenDriverIds, true)) {
-        $seenDriverIds[] = (int)$row['driver_user_id'];
-        $activeDrivers[] = $row;
-    }
+try {
+    $activeDrivers = db()->query(
+        "SELECT u.id AS driver_user_id, u.first_name, u.last_name, u.national_code,
+                w.waybill_number, w.send_status
+         FROM users u
+         INNER JOIN fuel_waybills w ON w.id = u.selected_waybill_id
+         WHERE u.user_type = 'driver'
+         ORDER BY u.id DESC"
+    )->fetchAll();
+} catch (PDOException $e) {
+    error_log('api_test active drivers fetch error: ' . $e->getMessage());
 }
 
 // انتخاب زیرصفحه از URL (?service=login|trip|active) — یک ری‌لود واقعی صفحه،
@@ -78,7 +83,7 @@ require __DIR__ . '/includes/header.php';
   </li>
   <li class="nav-item">
     <a href="?service=active" class="nav-link <?= $service === 'active' ? 'active' : '' ?>">
-      <span class="iconify" data-icon="solar:document-text-bold"></span> وب‌سرویس بارنامه فعال
+      <span class="iconify" data-icon="solar:document-text-bold"></span> وب‌سرویس بارنامه ی انتخاب شده
     </a>
   </li>
 </ul>
@@ -199,6 +204,63 @@ require __DIR__ . '/includes/header.php';
             <tr>
               <td><code>password</code></td><td>رشته</td><td>بله</td>
               <td>رمز عبور کاربر</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:document-text-bold"></span> پارامترهای خروجی
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr><th>نام</th><th>نوع</th><th>همیشه؟</th><th>توضیح</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>success</code></td><td>boolean</td><td>بله</td>
+              <td><code>true</code> در ورود موفق، در غیر این صورت <code>false</code></td>
+            </tr>
+            <tr>
+              <td><code>message</code></td><td>رشته</td><td>بله</td>
+              <td>پیام فارسی نتیجه (موفقیت یا علت خطا)</td>
+            </tr>
+            <tr>
+              <td><code>user</code></td><td>شیء</td><td>فقط در موفقیت</td>
+              <td>اطلاعات کاربر بدون هش رمز عبور؛ فیلدهای زیر را دارد</td>
+            </tr>
+            <tr>
+              <td><code>user.id</code></td><td>عدد</td><td>—</td>
+              <td>شناسه یکتای کاربر</td>
+            </tr>
+            <tr>
+              <td><code>user.national_code</code></td><td>رشته</td><td>—</td>
+              <td>کد ملی (نام کاربری)</td>
+            </tr>
+            <tr>
+              <td><code>user.first_name</code> / <code>user.last_name</code></td><td>رشته</td><td>—</td>
+              <td>نام و نام خانوادگی کاربر</td>
+            </tr>
+            <tr>
+              <td><code>user.user_type</code></td><td>رشته</td><td>—</td>
+              <td>نقش کاربر (<code>admin</code>، <code>region</code>، <code>operator</code>، <code>driver</code>)</td>
+            </tr>
+            <tr>
+              <td><code>user.user_type_label</code></td><td>رشته</td><td>—</td>
+              <td>برچسب فارسی نقش (مثلاً «ادمین»)</td>
+            </tr>
+            <tr>
+              <td><code>user.created_at</code> / <code>user.updated_at</code></td><td>رشته (تاریخ‌ساعت)</td><td>—</td>
+              <td>زمان ایجاد و آخرین ویرایش حساب</td>
+            </tr>
+            <tr>
+              <td><code>token</code></td><td>رشته</td><td>فقط در موفقیت</td>
+              <td>توکن موقت <code>driver_waybills</code> (۶۴ کاراکتر) برای فراخوانی وب‌سرویس‌های راننده بدون ارسال دوباره رمز؛ اگر ساخت توکن ممکن نباشد در پاسخ نمی‌آید</td>
+            </tr>
+            <tr>
+              <td><code>token_expires_in_minutes</code></td><td>عدد</td><td>همراه <code>token</code></td>
+              <td>مدت اعتبار توکن به دقیقه (حداکثر <?= e((string)ACCESS_TOKEN_TTL_MINUTES) ?> دقیقه)</td>
             </tr>
           </tbody>
         </table>
@@ -404,6 +466,27 @@ require __DIR__ . '/includes/header.php';
       </div>
 
       <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:document-text-bold"></span> پارامترهای خروجی
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr><th>نام</th><th>نوع</th><th>همیشه؟</th><th>توضیح</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>success</code></td><td>boolean</td><td>بله</td>
+              <td><code>true</code> اگر شروع/پایان سفر با موفقیت ثبت شد، در غیر این صورت <code>false</code></td>
+            </tr>
+            <tr>
+              <td><code>message</code></td><td>رشته</td><td>بله</td>
+              <td>پیام فارسی نتیجه؛ در موفقیت مشخص می‌کند سفر «شروع» شده یا «به پایان رسیده» و در خطا علت را می‌گوید</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
         <span class="iconify text-jade" data-icon="solar:server-square-bold"></span> کدهای وضعیت HTTP
       </h2>
       <div class="table-responsive mb-4">
@@ -486,7 +569,7 @@ require __DIR__ . '/includes/header.php';
 </div>
 
 <!-- ================================================================= -->
-<!-- ==================== ۳) وب‌سرویس بارنامه فعال ==================== -->
+<!-- ==================== ۳) وب‌سرویس بارنامه ی انتخاب شده ==================== -->
 <!-- ================================================================= -->
 <div class="api-service-panel <?= $service === 'active' ? '' : 'd-none' ?>" data-panel="active">
 
@@ -499,7 +582,12 @@ require __DIR__ . '/includes/header.php';
     <div class="card-body p-4">
 
       <?php if (!$activeDrivers): ?>
-        <div class="text-muted small">در حال حاضر هیچ راننده‌ای بارنامه فعال («ارسال شده») ندارد.</div>
+        <div class="text-muted small">
+          در حال حاضر هیچ راننده‌ای بارنامه ی انتخاب شده ندارد. این تریگر داخلی
+          (<code>users.selected_waybill_id</code>) فقط با کلیک واقعی روی «شروع سفر» در
+          <code>driver_waybills.php</code> ست می‌شود؛ برای تست این وب‌سرویس ابتدا باید
+          حداقل یک راننده واقعی روی «شروع سفر» یکی از بارنامه‌هایش کلیک کند.
+        </div>
       <?php else: ?>
         <div class="row g-3 align-items-end">
           <div class="col-md-8">
@@ -507,7 +595,7 @@ require __DIR__ . '/includes/header.php';
             <select class="form-select" id="activeDriverSelect">
               <?php foreach ($activeDrivers as $d): ?>
                 <option value="<?= e((string)$d['driver_user_id']) ?>">
-                  راننده <?= e($d['first_name'] . ' ' . $d['last_name']) ?> (<?= e($d['national_code']) ?>) — بارنامه فعال: <?= e($d['waybill_number']) ?>
+                  راننده <?= e($d['first_name'] . ' ' . $d['last_name']) ?> (<?= e($d['national_code']) ?>) — بارنامه ی انتخاب شده: <?= e($d['waybill_number']) ?> (<?= e($d['send_status']) ?>)
                 </option>
               <?php endforeach; ?>
             </select>
@@ -544,7 +632,7 @@ require __DIR__ . '/includes/header.php';
   <div class="card panel-card">
     <div class="card-header d-flex align-items-center gap-2">
       <span class="iconify text-purple fs-5" data-icon="solar:book-2-bold"></span>
-      <span class="fw-bold">مستندات وب‌سرویس بارنامه فعال</span>
+      <span class="fw-bold">مستندات وب‌سرویس بارنامه ی انتخاب شده</span>
     </div>
     <div class="card-body p-4">
 
@@ -593,6 +681,79 @@ require __DIR__ . '/includes/header.php';
       </div>
 
       <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:document-text-bold"></span> پارامترهای خروجی
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr><th>نام</th><th>نوع</th><th>همیشه؟</th><th>توضیح</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>success</code></td><td>boolean</td><td>بله</td>
+              <td><code>true</code> در پاسخ موفق (حتی وقتی بارنامه ی انتخاب شدهی وجود ندارد)، در خطا <code>false</code></td>
+            </tr>
+            <tr>
+              <td><code>message</code></td><td>رشته</td><td>بله</td>
+              <td>پیام فارسی نتیجه</td>
+            </tr>
+            <tr>
+              <td><code>waybill</code></td><td>شیء یا <code>null</code></td><td>فقط در موفقیت</td>
+              <td>بارنامه ی انتخاب شده راننده؛ اگر بارنامه ی انتخاب شدهی نباشد <code>null</code> است. فیلدهای زیر را دارد</td>
+            </tr>
+            <tr>
+              <td><code>waybill.id</code></td><td>عدد</td><td>—</td>
+              <td>شناسه یکتای بارنامه</td>
+            </tr>
+            <tr>
+              <td><code>waybill.waybill_number</code></td><td>رشته</td><td>—</td>
+              <td>شماره بارنامه</td>
+            </tr>
+            <tr>
+              <td><code>waybill.issue_date</code> / <code>waybill.issue_date_jalali</code></td><td>رشته</td><td>—</td>
+              <td>تاریخ صدور میلادی (<code>Y-m-d</code>) و معادل شمسی آن</td>
+            </tr>
+            <tr>
+              <td><code>waybill.distance_km</code></td><td>عدد</td><td>—</td>
+              <td>مسافت مسیر به کیلومتر</td>
+            </tr>
+            <tr>
+              <td><code>waybill.product_type</code></td><td>رشته</td><td>—</td>
+              <td>نوع فرآورده (مثلاً «نفتگاز»)</td>
+            </tr>
+            <tr>
+              <td><code>waybill.send_status</code></td><td>رشته</td><td>—</td>
+              <td>وضعیت فعلی بارنامه («ثبت شده»، «ارسال شده» و ...)؛ چون انتخاب‌شدن مستقل از این وضعیت است، می‌تواند هر مقداری باشد</td>
+            </tr>
+            <tr>
+              <td><code>waybill.trip_started_at</code></td><td>رشته (تاریخ‌ساعت)</td><td>—</td>
+              <td>زمان شروع سفر</td>
+            </tr>
+            <tr>
+              <td><code>waybill.origin_title</code> / <code>waybill.destination_title</code></td><td>رشته</td><td>—</td>
+              <td>عنوان مبدأ و مقصد</td>
+            </tr>
+            <tr>
+              <td><code>waybill.origin_lat</code> / <code>waybill.origin_lon</code></td><td>عدد</td><td>—</td>
+              <td>مختصات جغرافیایی مبدأ</td>
+            </tr>
+            <tr>
+              <td><code>waybill.destination_lat</code> / <code>waybill.destination_lon</code></td><td>عدد</td><td>—</td>
+              <td>مختصات جغرافیایی مقصد</td>
+            </tr>
+            <tr>
+              <td><code>waybill.origin_operator</code> / <code>waybill.destination_operator</code></td><td>رشته یا <code>null</code></td><td>—</td>
+              <td>نام اپراتور مبدأ/مقصد؛ اگر تعیین نشده باشد <code>null</code></td>
+            </tr>
+            <tr>
+              <td><code>waybill.seal_id</code></td><td>رشته یا <code>null</code></td><td>—</td>
+              <td>شناسه پلمپ تخصیص‌یافته به بارنامه</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
         <span class="iconify text-jade" data-icon="solar:server-square-bold"></span> کدهای وضعیت HTTP
       </h2>
       <div class="table-responsive mb-4">
@@ -601,7 +762,7 @@ require __DIR__ . '/includes/header.php';
             <tr><th>کد</th><th>وضعیت</th><th>توضیح</th></tr>
           </thead>
           <tbody>
-            <tr><td><span class="badge role-badge role-driver">200</span></td><td>موفق</td><td>پاسخ برگردانده شد؛ اگر بارنامه فعالی نباشد باز هم <code>200</code> است و <code>waybill</code> برابر <code>null</code> خواهد بود</td></tr>
+            <tr><td><span class="badge role-badge role-driver">200</span></td><td>موفق</td><td>پاسخ برگردانده شد؛ اگر بارنامه ی انتخاب شدهی نباشد باز هم <code>200</code> است و <code>waybill</code> برابر <code>null</code> خواهد بود</td></tr>
             <tr><td><span class="badge role-badge role-operator">401</span></td><td>عدم احراز</td><td>توکن نامعتبر است یا منقضی شده است</td></tr>
             <tr><td><span class="badge role-badge role-operator">403</span></td><td>عدم دسترسی</td><td>توکن متعلق به راننده نیست یا حساب غیرفعال است</td></tr>
             <tr><td><span class="badge role-badge role-region">405</span></td><td>متد غیرمجاز</td><td>فقط GET یا POST پذیرفته می‌شود</td></tr>
@@ -612,11 +773,11 @@ require __DIR__ . '/includes/header.php';
       </div>
 
       <h2 class="h6 fw-bold d-flex align-items-center gap-2">
-        <span class="iconify text-jade" data-icon="solar:check-circle-bold"></span> نمونه پاسخ موفق — بارنامه فعال وجود دارد (200)
+        <span class="iconify text-jade" data-icon="solar:check-circle-bold"></span> نمونه پاسخ موفق — بارنامه ی انتخاب شده وجود دارد (200)
       </h2>
       <pre data-lang="json" class="api-doc-code ltr-code">{
   "success": true,
-  "message": "بارنامه فعال با موفقیت دریافت شد.",
+  "message": "بارنامه ی انتخاب شده با موفقیت دریافت شد.",
   "waybill": {
     "id": 17,
     "waybill_number": "5",
@@ -639,11 +800,11 @@ require __DIR__ . '/includes/header.php';
 }</pre>
 
       <h2 class="h6 fw-bold d-flex align-items-center gap-2 mt-4">
-        <span class="iconify text-jade" data-icon="solar:info-circle-bold"></span> نمونه پاسخ موفق — بارنامه فعالی وجود ندارد (200)
+        <span class="iconify text-jade" data-icon="solar:info-circle-bold"></span> نمونه پاسخ موفق — بارنامه ی انتخاب شدهی وجود ندارد (200)
       </h2>
       <pre data-lang="json" class="api-doc-code ltr-code">{
   "success": true,
-  "message": "در حال حاضر هیچ بارنامه فعالی برای شما وجود ندارد.",
+  "message": "در حال حاضر هیچ بارنامه ی انتخاب شدهی برای شما وجود ندارد.",
   "waybill": null
 }</pre>
 
@@ -673,10 +834,12 @@ require __DIR__ . '/includes/header.php';
       <div class="alert alert-info d-flex align-items-start gap-2 mt-4 mb-0">
         <span class="iconify fs-5 mt-1" data-icon="solar:info-circle-bold"></span>
         <div>
-          <strong>نکات:</strong> «فعال» یعنی بارنامه‌ای که سفرش شروع شده اما هنوز پایان نیافته
-          (<code>send_status = 'ارسال شده'</code>). این وب‌سرویس فقط خواندنی است و هیچ داده‌ای را
-          تغییر نمی‌دهد؛ می‌توان آن را هر چند بار که لازم است (مثلاً هر چند ثانیه از اپلیکیشن
-          موبایل راننده) فراخوانی کرد.
+          <strong>نکات:</strong> «انتخاب‌شده» یک تریگر داخلی است (ستون <code>users.selected_waybill_id</code>)
+          و مستقل از <code>send_status</code> بارنامه؛ همین که راننده روی «شروع سفر» یک بارنامه در
+          <code>driver_waybills.php</code> کلیک کند (چه بررسی حصار را کامل کند چه نه)، همان بارنامه
+          به‌عنوان انتخاب‌شدهٔ او ثبت می‌شود، و با «پایان سفر» موفق پاک می‌شود. این وب‌سرویس فقط
+          خواندنی است و هیچ داده‌ای را تغییر نمی‌دهد؛ می‌توان آن را هر چند بار که لازم است (مثلاً هر
+          چند ثانیه از اپلیکیشن موبایل راننده) فراخوانی کرد.
         </div>
       </div>
     </div>

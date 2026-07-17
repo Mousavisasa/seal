@@ -417,7 +417,7 @@
   }
 })();
 
-/* ---------- صفحه تست وب‌سرویس بارنامه فعال ---------- */
+/* ---------- صفحه تست وب‌سرویس بارنامه ی انتخاب شده ---------- */
 (function () {
   'use strict';
   var activeSendBtn = document.getElementById('activeSendBtn');
@@ -438,9 +438,9 @@
     'const res = await fetch("' + activeApiUrl + '?token=" + encodeURIComponent(token));\n' +
     'const data = await res.json();\n' +
     'if (data.success && data.waybill) {\n' +
-    '  console.log("بارنامه فعال:", data.waybill);\n' +
+    '  console.log("بارنامه ی انتخاب شده:", data.waybill);\n' +
     '} else if (data.success) {\n' +
-    '  console.log("بارنامه فعالی وجود ندارد.");\n' +
+    '  console.log("بارنامه ی انتخاب شدهی وجود ندارد.");\n' +
     '} else {\n' +
     '  console.log("خطا:", data.message);\n' +
     '}';
@@ -809,6 +809,59 @@ document.addEventListener('visibilitychange', function () {
     json: 'JSON'
   };
 
+  // نگاشت زبان‌های صفحه به زبان‌های Prism برای رنگ‌آمیزی کد
+  var PRISM_LANGS = {
+    curl: 'bash',
+    javascript: 'javascript',
+    php: 'php',
+    json: 'json'
+  };
+
+  var COPY_ICON_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512">' +
+    '<path d="M384 336H192c-8.8 0-16-7.2-16-16V64c0-8.8 7.2-16 16-16l140.1 0L400 115.9V320c0 8.8-7.2 16-16 16zM192 384H384c35.3 0 64-28.7 64-64V115.9c0-12.7-5.1-24.9-14.1-33.9L366.1 14.1c-9-9-21.2-14.1-33.9-14.1H192c-35.3 0-64 28.7-64 64V320c0 35.3 28.7 64 64 64zM64 128c-35.3 0-64 28.7-64 64V448c0 35.3 28.7 64 64 64H256c35.3 0 64-28.7 64-64V416H272v32c0 8.8-7.2 16-16 16H64c-8.8 0-16-7.2-16-16V192c0-8.8 7.2-16 16-16H96V128H64z"/>' +
+    '</svg>';
+
+  var CHECK_ICON_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512">' +
+    '<path d="M441 103c9.4 9.4 9.4 24.6 0 33.9L177 401c-9.4 9.4-24.6 9.4-33.9 0L7 265c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l119 119L407 103c9.4-9.4 24.6-9.4 33.9 0z"/>' +
+    '</svg>';
+
+  // متن داخل pre را به یک عنصر <code class="language-…"> منتقل و با Prism رنگ‌آمیزی می‌کند.
+  // اگر جای دیگری از برنامه textContent خود pre را عوض کند (مثلاً پاسخ تست زنده)،
+  // MutationObserver پایین دوباره همین تابع را صدا می‌زند.
+  function highlightPre(pre, prismLang) {
+    var codeEl = pre.querySelector('code');
+    if (!codeEl) {
+      codeEl = document.createElement('code');
+      codeEl.textContent = pre.textContent;
+      pre.textContent = '';
+      pre.appendChild(codeEl);
+    }
+    codeEl.className = 'language-' + prismLang;
+    if (window.Prism && window.Prism.highlightElement) {
+      window.Prism.highlightElement(codeEl);
+    }
+  }
+
+  function observePre(pre, prismLang) {
+    if (!window.MutationObserver) return;
+    var busy = false;
+    var observer = new MutationObserver(function () {
+      if (busy) return;
+      // فقط وقتی متن مستقیماً داخل pre ریخته شده (بدون <code>) دوباره بپیچیم
+      var needsRewrap = !pre.querySelector('code') ||
+        Array.prototype.some.call(pre.childNodes, function (n) {
+          return n.nodeType === 3 && n.textContent.trim() !== '';
+        });
+      if (!needsRewrap) return;
+      busy = true;
+      highlightPre(pre, prismLang);
+      busy = false;
+    });
+    observer.observe(pre, { childList: true });
+  }
+
   function copyToClipboard(text, onDone) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () { onDone(true); }).catch(function () { onDone(false); });
@@ -832,6 +885,7 @@ document.addEventListener('visibilitychange', function () {
 
     var lang = pre.getAttribute('data-lang') || '';
     var label = LANG_LABELS[lang] || lang.toUpperCase();
+    var prismLang = PRISM_LANGS[lang] || 'none';
 
     var wrapper = document.createElement('div');
     wrapper.className = 'code-block';
@@ -846,16 +900,28 @@ document.addEventListener('visibilitychange', function () {
     var copyBtn = document.createElement('button');
     copyBtn.type = 'button';
     copyBtn.className = 'code-block-copy-btn';
-    copyBtn.textContent = 'کپی';
+
+    var copyIcon = document.createElement('span');
+    copyIcon.className = 'code-block-copy-icon';
+    copyIcon.innerHTML = COPY_ICON_SVG;
+
+    var copyText = document.createElement('span');
+    copyText.className = 'code-block-copy-text';
+    copyText.textContent = 'کپی کد';
+
+    copyBtn.appendChild(copyIcon);
+    copyBtn.appendChild(copyText);
 
     copyBtn.addEventListener('click', function () {
       copyToClipboard(pre.textContent || '', function (ok) {
         copyBtn.classList.toggle('copied', ok);
-        copyBtn.textContent = ok ? 'کپی شد' : 'کپی';
+        copyIcon.innerHTML = ok ? CHECK_ICON_SVG : COPY_ICON_SVG;
+        copyText.textContent = ok ? 'کپی شد!' : 'کپی کد';
         if (ok) {
           setTimeout(function () {
             copyBtn.classList.remove('copied');
-            copyBtn.textContent = 'کپی';
+            copyIcon.innerHTML = COPY_ICON_SVG;
+            copyText.textContent = 'کپی کد';
           }, 1500);
         }
       });
@@ -867,5 +933,8 @@ document.addEventListener('visibilitychange', function () {
     pre.parentNode.insertBefore(wrapper, pre);
     wrapper.appendChild(toolbar);
     wrapper.appendChild(pre);
+
+    highlightPre(pre, prismLang);
+    observePre(pre, prismLang);
   });
 })();

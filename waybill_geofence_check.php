@@ -68,6 +68,14 @@ if ($driver && $waybillId > 0) {
         } elseif ($action === 'end' && $waybill['send_status'] !== 'ارسال شده') {
             $errors[] = 'این بارنامه در وضعیت «ارسال شده» نیست، پس امکان پایان سفر وجود ندارد.';
         }
+
+        // تریگر داخلی «بارنامه انتخاب‌شده»: همین که راننده روی «شروع سفر» کلیک کرده
+        // و به این صفحه رسیده، همین بارنامه به‌عنوان بارنامه انتخاب‌شدهٔ او ثبت می‌شود —
+        // مستقل از send_status و مستقل از اینکه بررسی حصار/تایید نهایی انجام شود یا نه.
+        if (!$errors && $action === 'start') {
+            $upd = db()->prepare('UPDATE users SET selected_waybill_id = ? WHERE id = ?');
+            $upd->execute([$waybillId, $driver['id']]);
+        }
     } catch (PDOException $e) {
         error_log('Waybill geofence check error: ' . $e->getMessage());
         $errors[] = 'خطایی در دریافت اطلاعات بارنامه رخ داد.';

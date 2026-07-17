@@ -87,6 +87,11 @@ try {
     }
     $upd = db()->prepare("UPDATE fuel_waybills SET send_status = 'تحویل شده', trip_ended_at = NOW() WHERE id = ?");
     $upd->execute([$waybillId]);
+
+    // با پایان سفر، این بارنامه دیگر «انتخاب‌شدهٔ» راننده نیست
+    $clear = db()->prepare('UPDATE users SET selected_waybill_id = NULL WHERE id = ? AND selected_waybill_id = ?');
+    $clear->execute([$driver['id'], $waybillId]);
+
     json_response(200, true, 'سفر با موفقیت به پایان رسید.');
 } catch (PDOException $e) {
     error_log('API trip_action error: ' . $e->getMessage());

@@ -18,12 +18,14 @@ CREATE TABLE IF NOT EXISTS `users` (
   `user_type` ENUM('admin','driver','operator','region') NOT NULL DEFAULT 'driver',
   `region_id` INT NULL DEFAULT NULL,
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+  `selected_waybill_id` INT UNSIGNED NULL DEFAULT NULL,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_national_code` (`national_code`),
   KEY `idx_users_region` (`region_id`),
-  KEY `idx_users_active` (`is_active`)
+  KEY `idx_users_active` (`is_active`),
+  KEY `idx_users_selected_waybill` (`selected_waybill_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- کاربر ادمین پیش‌فرض
@@ -272,5 +274,11 @@ INSERT INTO `seals` (`seal_id`, `seal_password`, `seal_status`, `region_id`, `cr
 -- 5) افزودن ماژول انبارداری پلمپ (پلمپ‌ها و تاریخچه رخدادها):
 -- (کد کامل ساخت جدول در بالای همین فایل، بخش «ماژول انبارداری پلمپ» موجود است؛
 --  کافی است دو دستور CREATE TABLE مربوط به seals و seal_movements را از آن‌جا اجرا کنید.)
+--
+-- 6) افزودن بارنامه «انتخاب‌شده» راننده (تریگر داخلی؛ با کلیک روی «شروع سفر» در
+--    waybill_geofence_check.php ست می‌شود، مستقل از وضعیت send_status بارنامه):
+-- ALTER TABLE `users`
+--   ADD COLUMN `selected_waybill_id` INT UNSIGNED NULL DEFAULT NULL AFTER `is_active`,
+--   ADD KEY `idx_users_selected_waybill` (`selected_waybill_id`);
 
 
