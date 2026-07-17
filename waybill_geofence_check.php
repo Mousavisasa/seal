@@ -106,15 +106,10 @@ $actionButton = $action === 'end_trip' ? 'ثبت پایان سفر' : 'ثبت ش
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
-<!--
-  TODO(مدیر پروژه): تگ‌های CSS/JS واقعی کتابخانه نقشه Mapp (map.ir) را همین‌جا
-  اضافه کنید (لینک CDN + کلید API واقعی در صورت نیاز). در ادامه از window.Mapp
-  و متدهای addLayers()/addGeolocation() طبق نمونه ارسالی استفاده شده است.
--->
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <style>
-  #app { height: 420px; border-radius: .75rem; }
+  #map { height: 420px; border-radius: .75rem; z-index: 0; }
   .my-location-dot {
     display: block;
     width: 14px;
@@ -182,7 +177,7 @@ $actionButton = $action === 'end_trip' ? 'ثبت پایان سفر' : 'ثبت ش
       <div class="col-lg-8">
         <div class="card panel-card">
           <div class="card-body p-2">
-            <div id="app"></div>
+            <div id="map"></div>
           </div>
         </div>
       </div>
@@ -224,39 +219,53 @@ $actionButton = $action === 'end_trip' ? 'ثبت پایان سفر' : 'ثبت ش
   window.MAPIR_API_KEY = <?= json_encode(MAPIR_API_KEY) ?>;
 </script>
 <?php if (!$errors): ?>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-$(document).ready(function () {
+(function () {
   var TARGET_LOCATION_ID = <?= (int)$targetLocationId ?>;
   var TARGET_LAT = <?= json_encode($targetLat) ?>;
   var TARGET_LON = <?= json_encode($targetLon) ?>;
-  var CHECK_URL  = '<?= BASE_URL ?>/map/geofence/check.php';
+  var TARGET_TITLE = <?= json_encode($targetTitle) ?>;
+  var CHECK_URL = '<?= BASE_URL ?>/map/geofence/check.php';
 
-  var resultDiv    = document.getElementById('result');
-  var btnConfirm   = document.getElementById('btnConfirm');
-  var btnRecheck   = document.getElementById('btnRecheck');
-  var lastLatLng   = null;
-  var userMarker   = null;
+  var resultDiv  = document.getElementById('result');
+  var btnConfirm = document.getElementById('btnConfirm');
+  var btnRecheck = document.getElementById('btnRecheck');
+  var lastLatLng = null;
+  var userMarker = null;
 
   function showResult(type, text) {
     resultDiv.className = 'alert alert-' + type;
     resultDiv.textContent = text;
   }
 
-  // مقداردهی اولیه نقشه با کتابخانه Mapp (map.ir) — طبق نمونه ارسالی
-  var app = new Mapp({
-    element: '#app',
-    presets: {
-      latlng: { lat: TARGET_LAT || 32, lng: TARGET_LON || 52 },
-      zoom: 14
-    },
-    apiKey: window.MAPIR_API_KEY
-  });
-  app.addLayers();
-  app.addGeolocation(); // دریافت موقعیت فعلی کاربر از طریق همین API
+  // همان لایه‌های پایه و مقداردهی نقشه که در map/index.php استفاده شده
+  var baseLayers = {
+    'تم روز (داخلی)': L.tileLayer('https://memaps.ir/hot/{z}/{x}/{y}.png',
+      { maxZoom: 20, attribution: 'Memaps Hot' }),
+    'ماهواره‌ای (داخلی)': L.tileLayer('https://memaps.ir/api/google-earth/satellite/{z}/{x}/{y}.png',
+      { maxZoom: 20, attribution: 'Google Satellite via Memaps' }),
+    'نقشه جهانی (OSM)': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' })
+  };
 
-  // نشانگر مکان هدف (مبدا/مقصد بارنامه) روی نقشه
-  if (app.map && TARGET_LAT && TARGET_LON) {
-    L.marker([TARGET_LAT, TARGET_LON]).addTo(app.map).bindPopup(<?= json_encode($targetTitle) ?>);
+  var map = L.map('map', {
+    center: [TARGET_LAT || 35.6892, TARGET_LON || 51.3890],
+    zoom: 14,
+    layers: [baseLayers['تم روز (داخلی)']]
+  });
+  L.control.layers(baseLayers).addTo(map);
+
+  var myLocationIcon = L.divIcon({
+    className: 'my-location-marker',
+    html: '<span class="my-location-dot"></span>',
+    iconSize: [18, 18],
+    iconAnchor: [9, 9]
+  });
+
+  // نشانگر مکان هدف (مبدا/مقصد بارنامه)
+  if (TARGET_LAT && TARGET_LON) {
+    L.marker([TARGET_LAT, TARGET_LON]).addTo(map).bindPopup(TARGET_TITLE);
   }
 
   function checkGeofence(lat, lon) {
@@ -282,45 +291,42 @@ $(document).ready(function () {
       });
   }
 
-  // رویدادهای موقعیت‌یابی که addGeolocation در نقشه (Leaflet) فعال می‌کند
-  if (app.map && typeof app.map.on === 'function') {
-    app.map.on('locationfound', function (e) {
-      lastLatLng = e.latlng;
+  function locate() {
+    if (!navigator.geolocation) {
+      showResult('danger', 'مرورگر شما از موقعیت‌یابی پشتیبانی نمی‌کند.');
+      return;
+    }
+
+    showResult('secondary', 'در حال دریافت موقعیت مکانی شما…');
+
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      lastLatLng = [pos.coords.latitude, pos.coords.longitude];
 
       if (userMarker) {
-        userMarker.setLatLng(e.latlng);
+        userMarker.setLatLng(lastLatLng);
       } else {
-        userMarker = L.marker(e.latlng, {
-          icon: L.divIcon({
-            className: 'my-location-marker',
-            html: '<span class="my-location-dot"></span>',
-            iconSize: [18, 18],
-            iconAnchor: [9, 9]
-          }),
+        userMarker = L.marker(lastLatLng, {
+          icon: myLocationIcon,
           title: 'موقعیت فعلی شما',
           zIndexOffset: 1000
-        }).addTo(app.map).bindTooltip('موقعیت فعلی شما');
+        }).addTo(map).bindTooltip('موقعیت فعلی شما');
       }
 
-      checkGeofence(e.latlng.lat, e.latlng.lng);
-    });
-
-    app.map.on('locationerror', function () {
-      showResult('danger', 'دسترسی به موقعیت مکانی امکان‌پذیر نشد. GPS دستگاه خود را روشن کرده و اجازه دسترسی به موقعیت را بدهید.');
+      map.setView(lastLatLng, 15);
+      checkGeofence(lastLatLng[0], lastLatLng[1]);
+    }, function () {
+      showResult('danger', 'دسترسی به موقعیت مکانی امکان‌پذیر نشد. GPS دستگاه خود را روشن کرده و اجازهٔ دسترسی به موقعیت را بدهید.');
+    }, {
+      enableHighAccuracy: true,
+      timeout: 15000
     });
   }
 
-  btnRecheck.addEventListener('click', function () {
-    if (lastLatLng) {
-      checkGeofence(lastLatLng.lat, lastLatLng.lng);
-    } else if (app.map && typeof app.map.locate === 'function') {
-      showResult('secondary', 'در حال دریافت موقعیت مکانی شما…');
-      app.map.locate({ setView: true, enableHighAccuracy: true });
-    } else {
-      showResult('warning', 'موقعیت فعلی شما هنوز دریافت نشده است.');
-    }
-  });
-});
+  btnRecheck.addEventListener('click', locate);
+
+  // دریافت خودکار موقعیت هنگام بارگذاری صفحه
+  locate();
+})();
 </script>
 <?php endif; ?>
 </body>
