@@ -113,7 +113,11 @@ require __DIR__ . '/../includes/header.php';
             <td class="ltr-text text-muted small">
               <?= ((float)$l['lat'] !== 0.0 || (float)$l['lon'] !== 0.0) ? e($l['lat'] . ', ' . $l['lon']) : '—' ?>
             </td>
-            <td class="text-start">
+            <td class="text-start d-flex gap-2 justify-content-end">
+              <a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+                 href="<?= BASE_URL ?>/map/index.php?location_id=<?= e((string)$l['id']) ?>">
+                <span class="iconify" data-icon="solar:map-point-bold"></span> نقشه
+              </a>
               <a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1"
                  href="<?= BASE_URL ?>/locations/edit.php?id=<?= e((string)$l['id']) ?>">
                 <span class="iconify" data-icon="solar:pen-bold"></span> ویرایش

@@ -300,23 +300,15 @@ $statusClassMap = [
 
                               <div class="mt-auto pt-2 d-flex gap-2">
                                   <?php if ($w['send_status'] === 'ثبت شده'): ?>
-                                      <form method="post" action="<?= BASE_URL ?>/driver_waybills.php" class="flex-fill">
-                                          <input type="hidden" name="token" value="<?= e($token) ?>">
-                                          <input type="hidden" name="id" value="<?= e((string)$w['id']) ?>">
-                                          <input type="hidden" name="action" value="start_trip">
-                                          <button type="submit" class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
-                                              <span class="iconify" data-icon="solar:play-circle-bold"></span> شروع سفر
-                                          </button>
-                                      </form>
+                                      <a href="<?= BASE_URL ?>/waybill_geofence_check.php?token=<?= e(rawurlencode($token)) ?>&id=<?= e((string)$w['id']) ?>&action=start_trip"
+                                         class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
+                                          <span class="iconify" data-icon="solar:play-circle-bold"></span> شروع سفر
+                                      </a>
                                   <?php elseif ($w['send_status'] === 'ارسال شده'): ?>
-                                      <form method="post" action="<?= BASE_URL ?>/driver_waybills.php" class="flex-fill">
-                                          <input type="hidden" name="token" value="<?= e($token) ?>">
-                                          <input type="hidden" name="id" value="<?= e((string)$w['id']) ?>">
-                                          <input type="hidden" name="action" value="end_trip">
-                                          <button type="submit" class="btn btn-soft-purple w-100 d-flex align-items-center justify-content-center gap-2">
-                                              <span class="iconify" data-icon="solar:flag-bold"></span> پایان سفر
-                                          </button>
-                                      </form>
+                                      <a href="<?= BASE_URL ?>/waybill_geofence_check.php?token=<?= e(rawurlencode($token)) ?>&id=<?= e((string)$w['id']) ?>&action=end_trip"
+                                         class="btn btn-soft-purple w-100 d-flex align-items-center justify-content-center gap-2">
+                                          <span class="iconify" data-icon="solar:flag-bold"></span> پایان سفر
+                                      </a>
                                   <?php elseif ($w['send_status'] === 'تحویل شده'): ?>
                                       <div class="text-center w-100 text-muted small py-2">
                                           <span class="iconify" data-icon="solar:check-circle-bold"></span> این سفر با موفقیت به پایان رسیده است.

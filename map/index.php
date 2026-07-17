@@ -8,6 +8,8 @@ require_once __DIR__ . '/../helpers/auth.php';
 
 require_login();
 
+$initialLocationId = (int)($_GET['location_id'] ?? 0);
+
 $page_title = 'بررسی حصار جغرافیایی';
 $active = 'map';
 require __DIR__ . '/../includes/header.php';
@@ -16,6 +18,16 @@ require __DIR__ . '/../includes/header.php';
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
 <style>
   #map { height: 480px; border-radius: .75rem; z-index: 0; }
+  .my-location-dot {
+    display: block;
+    width: 14px;
+    height: 14px;
+    background: #1a73e8;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(26, 115, 232, .4);
+    cursor: pointer;
+  }
 </style>
 
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
@@ -64,9 +76,20 @@ require __DIR__ . '/../includes/header.php';
   </div>
 </div>
 
+<div class="d-flex flex-wrap gap-2 mt-4">
+  <button id="btnFocusCurrent" type="button" class="btn btn-outline-primary d-flex align-items-center gap-2">
+    <span class="iconify" data-icon="solar:gps-bold"></span> تمرکز روی موقعیت فعلی
+  </button>
+  <button id="btnFocusSelected" type="button" class="btn btn-outline-secondary d-flex align-items-center gap-2">
+    <span class="iconify" data-icon="solar:point-on-map-bold"></span> تمرکز روی مکان انتخاب‌شده
+  </button>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function () {
+  const initialLocationId = <?= (int)$initialLocationId ?>;
+
   // لایه‌های پایه — پیش‌فرض تایل داخلی تا در ایران بدون مشکل لود شود
   const baseLayers = {
     'تم روز (داخلی)': L.tileLayer('https://memaps.ir/hot/{z}/{x}/{y}.png',
@@ -83,6 +106,15 @@ require __DIR__ . '/../includes/header.php';
   let marker;
   let fenceLayer;           // لایهٔ محدودهٔ مکان انتخاب‌شده
   const locationsById = {}; // کش مکان‌های خوانده‌شده از جدول locations
+
+  let myLocationMarker;     // نشانگر موقعیت فعلی کاربر (GPS)
+  let currentLatLng;        // آخرین مختصات دریافتی از GPS
+  const myLocationIcon = L.divIcon({
+    className: 'my-location-marker',
+    html: '<span class="my-location-dot"></span>',
+    iconSize: [18, 18],
+    iconAnchor: [9, 9]
+  });
 
   const select = document.getElementById('placeId');
   const resultDiv = document.getElementById('result');
@@ -107,18 +139,55 @@ require __DIR__ . '/../includes/header.php';
         opt.textContent = `${loc.title} (${loc.location_code})`;
         select.appendChild(opt);
       }
+
+      if (initialLocationId && locationsById[initialLocationId]) {
+        select.value = initialLocationId;
+        select.dispatchEvent(new Event('change'));
+      }
     } catch (err) {
       select.innerHTML = '<option value="">خطا در بارگذاری مکان‌ها</option>';
     }
   })();
 
-  // با انتخاب مکان، محدودهٔ آن روی نقشه رسم شود
-  select.addEventListener('change', function () {
+  // دریافت موقعیت فعلی از GPS و نمایش نشانگر آبی رنگ روی نقشه
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      currentLatLng = [pos.coords.latitude, pos.coords.longitude];
+
+      if (myLocationMarker) {
+        myLocationMarker.setLatLng(currentLatLng);
+      } else {
+        myLocationMarker = L.marker(currentLatLng, {
+          icon: myLocationIcon,
+          title: 'موقعیت فعلی شما',
+          zIndexOffset: 1000
+        }).addTo(map)
+          .bindTooltip('موقعیت فعلی شما')
+          .on('click', function () {
+            document.getElementById('inLat').value = currentLatLng[0].toFixed(6);
+            document.getElementById('inLon').value = currentLatLng[1].toFixed(6);
+
+            if (marker) {
+              marker.setLatLng(currentLatLng);
+            } else {
+              marker = L.marker(currentLatLng).addTo(map);
+            }
+          });
+      }
+
+      map.setView(currentLatLng, 15);
+    }, function () {
+      // در صورت رد دسترسی یا خطا، کاربر می‌تواند دستی روی نقشه کلیک کند
+    });
+  }
+
+  // رسم محدودهٔ مکان انتخاب‌شده و تمرکز نقشه روی آن
+  function focusSelectedLocation() {
     if (fenceLayer) {
       map.removeLayer(fenceLayer);
       fenceLayer = null;
     }
-    const loc = locationsById[this.value];
+    const loc = locationsById[select.value];
     if (!loc) return;
 
     if (loc.geojson) {
@@ -129,6 +198,27 @@ require __DIR__ . '/../includes/header.php';
     } else if (loc.lat || loc.lon) {
       map.setView([loc.lat, loc.lon], 14);
     }
+  }
+
+  // با انتخاب مکان، محدودهٔ آن روی نقشه رسم شود
+  select.addEventListener('change', focusSelectedLocation);
+
+  // تمرکز روی موقعیت فعلی کاربر (GPS)
+  document.getElementById('btnFocusCurrent').addEventListener('click', function () {
+    if (!currentLatLng) {
+      showResult('warning', 'موقعیت فعلی هنوز دریافت نشده است.');
+      return;
+    }
+    map.setView(currentLatLng, 15);
+  });
+
+  // تمرکز روی مکان انتخاب‌شده (محدودهٔ geojson)
+  document.getElementById('btnFocusSelected').addEventListener('click', function () {
+    if (!select.value) {
+      showResult('warning', 'لطفاً ابتدا یک مکان را انتخاب کنید.');
+      return;
+    }
+    focusSelectedLocation();
   });
 
   // کلیک روی نقشه برای انتخاب مختصات
