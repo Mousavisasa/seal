@@ -14,7 +14,12 @@
  *   با «پایان سفر» به «تحویل شده» تبدیل شده، تا کاربر نتیجه عملش را ببیند)
  * - دکمه «شروع سفر» فقط برای بارنامه با وضعیت «ثبت شده» نمایش داده می‌شود
  * - دکمه «پایان سفر» فقط برای بارنامه با وضعیت «ارسال شده» نمایش داده می‌شود
- * - هر عملیات، مالکیت بارنامه (driver_user_id) را دوباره از دیتابیس بررسی می‌کند
+ *
+ * توجه: این صفحه دیگر خودش عملیات شروع/پایان سفر را انجام نمی‌دهد. دکمه‌ها
+ * کاربر را با یک توکن یک‌بارمصرف مخصوص همان عملیات (helpers/tokens.php::
+ * create_trip_action_token) به waybill_geofence_check.php می‌فرستند؛ آن صفحه
+ * پس از تایید حصار جغرافیایی، با همان توکن به وب‌سرویس api/trip_action.php
+ * درخواست می‌زند تا سفر واقعاً شروع/پایان یابد.
  */
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/helpers/functions.php';
@@ -43,61 +48,6 @@ function resolve_driver_from_token(string $token): array
     return [$driver, null];
 }
 
-// ---------- عملیات شروع/پایان سفر (POST همراه با توکن) ----------
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['action'] ?? '', ['start_trip', 'end_trip'], true)) {
-    $actionToken = trim((string)($_POST['token'] ?? ''));
-    $waybillId = (int)($_POST['id'] ?? 0);
-    $action = (string)$_POST['action'];
-    $actingDriver = null;
-
-    try {
-        [$actingDriver, $tokenError] = resolve_driver_from_token($actionToken);
-        if (!$actingDriver) {
-            $errors[] = $tokenError;
-        } elseif ($waybillId <= 0) {
-            $errors[] = 'درخواست نامعتبر است.';
-        } else {
-            $stmt = db()->prepare('SELECT * FROM fuel_waybills WHERE id = ? LIMIT 1');
-            $stmt->execute([$waybillId]);
-            $target = $stmt->fetch();
-
-            if (!$target) {
-                $errors[] = 'بارنامه مورد نظر یافت نشد.';
-            } elseif ((int)$target['driver_user_id'] !== (int)$actingDriver['id']) {
-                $errors[] = 'این بارنامه به شما تخصیص داده نشده است.';
-            } elseif ($action === 'start_trip') {
-                if ($target['send_status'] !== 'ثبت شده') {
-                    $errors[] = 'این بارنامه قبلاً شروع شده یا در وضعیت دیگری قرار دارد.';
-                } else {
-                    $upd = db()->prepare("UPDATE fuel_waybills SET send_status = 'ارسال شده', trip_started_at = NOW() WHERE id = ?");
-                    $upd->execute([$waybillId]);
-                }
-            } elseif ($action === 'end_trip') {
-                if ($target['send_status'] !== 'ارسال شده') {
-                    $errors[] = 'این بارنامه هنوز شروع نشده یا قبلاً تحویل داده شده است.';
-                } else {
-                    $upd = db()->prepare("UPDATE fuel_waybills SET send_status = 'تحویل شده', trip_ended_at = NOW() WHERE id = ?");
-                    $upd->execute([$waybillId]);
-                }
-            }
-        }
-    } catch (PDOException $e) {
-        error_log('Driver waybills trip action error: ' . $e->getMessage());
-        $errors[] = 'خطایی در ثبت عملیات رخ داد. لطفاً دوباره تلاش کنید.';
-    }
-
-    // بازگشت به همان صفحه با همان توکن (Post/Redirect/Get) تا رفرش صفحه دوباره فرم ارسال نکند
-    if (!$errors) {
-        header('Location: ' . BASE_URL . '/driver_waybills.php?token=' . rawurlencode($actionToken));
-        exit;
-    }
-    // در صورت خطا، به‌جای اعتبارسنجی دوباره توکن، همان نتیجه را مستقیم استفاده می‌کنیم
-    $token = $actionToken;
-    if ($actingDriver) {
-        $driver = $actingDriver;
-    }
-}
-
 // ---------- روش ۱: ورود با توکن (GET یا نتیجه اقدام بالا) ----------
 if (!$driver && $token !== '') {
     try {
@@ -112,7 +62,7 @@ if (!$driver && $token !== '') {
 }
 
 // ---------- روش ۲: ورود مستقیم با فرم کد ملی/رمز عبور (POST) ----------
-if (!$driver && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === '') {
+if (!$driver && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $submittedUsername = normalize_digits((string)($_POST['username'] ?? ''));
     $password = (string)($_POST['password'] ?? '');
 
@@ -300,12 +250,14 @@ $statusClassMap = [
 
                               <div class="mt-auto pt-2 d-flex gap-2">
                                   <?php if ($w['send_status'] === 'ثبت شده'): ?>
-                                      <a href="<?= BASE_URL ?>/waybill_geofence_check.php?token=<?= e(rawurlencode($token)) ?>&id=<?= e((string)$w['id']) ?>&action=start_trip"
+                                      <?php $tripToken = create_trip_action_token((int)$driver['id'], 'start', (int)$w['id']); ?>
+                                      <a href="<?= BASE_URL ?>/waybill_geofence_check.php?token=<?= e(rawurlencode($tripToken)) ?>"
                                          class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
                                           <span class="iconify" data-icon="solar:play-circle-bold"></span> شروع سفر
                                       </a>
                                   <?php elseif ($w['send_status'] === 'ارسال شده'): ?>
-                                      <a href="<?= BASE_URL ?>/waybill_geofence_check.php?token=<?= e(rawurlencode($token)) ?>&id=<?= e((string)$w['id']) ?>&action=end_trip"
+                                      <?php $tripToken = create_trip_action_token((int)$driver['id'], 'end', (int)$w['id']); ?>
+                                      <a href="<?= BASE_URL ?>/waybill_geofence_check.php?token=<?= e(rawurlencode($tripToken)) ?>"
                                          class="btn btn-soft-purple w-100 d-flex align-items-center justify-content-center gap-2">
                                           <span class="iconify" data-icon="solar:flag-bold"></span> پایان سفر
                                       </a>

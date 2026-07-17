@@ -101,3 +101,54 @@ function validate_access_token(string $token, string $expectedPurpose = 'driver_
     unset($user['password']);
     return $user;
 }
+
+/**
+ * ساخت توکن یک‌بارمصرف مخصوص «شروع/پایان سفر» یک بارنامه مشخص.
+ * عملیات (start/end) و شناسه بارنامه داخل خودِ توکن (فیلد purpose) قفل می‌شود
+ * تا صفحه بررسی حصار و وب‌سرویس مربوطه فقط با همین یک توکن کار کنند و
+ * نیازی به پارامتر جداگانه id/action در URL یا درخواست نباشد.
+ */
+function create_trip_action_token(int $userId, string $action, int $waybillId): string
+{
+    return create_access_token($userId, 'trip:' . $action . ':' . $waybillId);
+}
+
+/**
+ * اعتبارسنجی توکن «شروع/پایان سفر» و استخراج عملیات + شناسه بارنامه از آن
+ * @return array|null ['driver'=>..., 'action'=>'start'|'end', 'waybill_id'=>int] یا null
+ */
+function validate_trip_action_token(string $token): ?array
+{
+    if ($token === '' || !preg_match('/^[a-f0-9]{64}$/', $token)) {
+        return null;
+    }
+
+    ensure_access_tokens_table();
+
+    $stmt = db()->prepare(
+        "SELECT u.*, t.purpose FROM access_tokens t
+         INNER JOIN users u ON u.id = t.user_id
+         WHERE t.token = ? AND t.purpose LIKE 'trip:%' AND t.expires_at >= NOW()
+         LIMIT 1"
+    );
+    $stmt->execute([$token]);
+    $row = $stmt->fetch();
+
+    if (!$row) {
+        return null;
+    }
+
+    $parts = explode(':', $row['purpose'], 3);
+    if (count($parts) !== 3 || !in_array($parts[1], ['start', 'end'], true) || !ctype_digit($parts[2])) {
+        return null;
+    }
+
+    $driver = $row;
+    unset($driver['password'], $driver['purpose']);
+
+    return [
+        'driver'     => $driver,
+        'action'     => $parts[1],
+        'waybill_id' => (int)$parts[2],
+    ];
+}

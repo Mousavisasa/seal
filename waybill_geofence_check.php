@@ -1,39 +1,41 @@
 <?php
 /**
  * بررسی حصار جغرافیایی قبل از تایید نهایی «شروع سفر» / «پایان سفر»
- * (بدون نیاز به سشن/ورود به پنل — دقیقاً مثل driver_waybills.php با همان توکن)
+ * (بدون نیاز به سشن/ورود به پنل)
  *
- * ورودی (GET):
- *   token  - توکن دسترسی موقت راننده (از driver_waybills.php)
- *   id     - شناسه بارنامه
- *   action - start_trip یا end_trip
+ * ورودی (GET): فقط و فقط «token».
+ * این توکن یک‌بارمصرف و مخصوص همین عملیات است (ساخته‌شده در driver_waybills.php
+ * با helpers/tokens.php::create_trip_action_token) و عملیات (شروع/پایان سفر) +
+ * شناسه بارنامه از داخل خودِ توکن استخراج می‌شود؛ نقش/هویت راننده هم از همین
+ * توکن به دست می‌آید — نه از پارامتر جداگانه‌ای در URL.
  *
  * این صفحه خودش هیچ تغییری در وضعیت بارنامه ایجاد نمی‌کند؛ فقط موقعیت فعلی
- * راننده (از طریق addGeolocation در Mapp) را می‌گیرد، با محدودهٔ جغرافیایی
- * مکان مبدا (برای شروع سفر) یا مقصد (برای پایان سفر) از طریق
- * map/geofence/check.php مقایسه می‌کند، و در صورت تایید داخل‌محدوده‌بودن،
- * دکمهٔ تایید نهایی را فعال می‌کند که همان فرم POST قبلی را به
- * driver_waybills.php ارسال می‌کند.
+ * راننده را می‌گیرد و با محدودهٔ جغرافیایی مکان مبدا (برای شروع سفر) یا مقصد
+ * (برای پایان سفر) مقایسه می‌کند. تایید نهایی («شروع/پایان سفر») همیشه با
+ * کلیک دستی کاربر انجام می‌شود و با همین توکن به وب‌سرویس api/trip_action.php
+ * درخواست می‌زند تا سفر واقعاً شروع/پایان یابد.
  */
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/helpers/functions.php';
 require_once __DIR__ . '/helpers/tokens.php';
 
-$token     = trim((string)($_GET['token'] ?? ''));
-$waybillId = (int)($_GET['id'] ?? 0);
-$action    = (string)($_GET['action'] ?? '');
+$token = trim((string)($_GET['token'] ?? ''));
 
-$errors  = [];
-$driver  = null;
-$waybill = null;
+$errors    = [];
+$driver    = null;
+$waybill   = null;
+$action    = '';
+$waybillId = 0;
 
-if (!in_array($action, ['start_trip', 'end_trip'], true)) {
-    $errors[] = 'عملیات درخواستی نامعتبر است.';
+$resolved = validate_trip_action_token($token);
+if (!$resolved) {
+    $errors[] = 'توکن نامعتبر است یا منقضی شده است. لطفاً دوباره وارد شوید.';
 } else {
-    $driver = validate_access_token($token, 'driver_waybills');
-    if (!$driver) {
-        $errors[] = 'توکن نامعتبر است یا منقضی شده است. لطفاً دوباره وارد شوید.';
-    } elseif ($driver['user_type'] !== 'driver') {
+    $driver    = $resolved['driver'];
+    $action    = $resolved['action']; // 'start' یا 'end'
+    $waybillId = $resolved['waybill_id'];
+
+    if ($driver['user_type'] !== 'driver') {
         $driver = null;
         $errors[] = 'این توکن متعلق به یک حساب راننده نیست.';
     } elseif ((int)($driver['is_active'] ?? 1) === 0) {
@@ -46,8 +48,8 @@ if ($driver && $waybillId > 0) {
     try {
         $stmt = db()->prepare(
             'SELECT w.*,
-                    ol.title AS origin_title, ol.lat AS origin_lat, ol.lon AS origin_lon,
-                    dl.title AS destination_title, dl.lat AS destination_lat, dl.lon AS destination_lon
+                    ol.title AS origin_title, ol.lat AS origin_lat, ol.lon AS origin_lon, ol.geojson AS origin_geojson,
+                    dl.title AS destination_title, dl.lat AS destination_lat, dl.lon AS destination_lon, dl.geojson AS destination_geojson
              FROM fuel_waybills w
              INNER JOIN locations ol ON ol.id = w.origin_location_id
              INNER JOIN locations dl ON dl.id = w.destination_location_id
@@ -61,9 +63,9 @@ if ($driver && $waybillId > 0) {
         } elseif ((int)$waybill['driver_user_id'] !== (int)$driver['id']) {
             $waybill = null;
             $errors[] = 'این بارنامه به شما تخصیص داده نشده است.';
-        } elseif ($action === 'start_trip' && $waybill['send_status'] !== 'ثبت شده') {
+        } elseif ($action === 'start' && $waybill['send_status'] !== 'ثبت شده') {
             $errors[] = 'این بارنامه در وضعیت «ثبت شده» نیست، پس امکان شروع سفر وجود ندارد.';
-        } elseif ($action === 'end_trip' && $waybill['send_status'] !== 'ارسال شده') {
+        } elseif ($action === 'end' && $waybill['send_status'] !== 'ارسال شده') {
             $errors[] = 'این بارنامه در وضعیت «ارسال شده» نیست، پس امکان پایان سفر وجود ندارد.';
         }
     } catch (PDOException $e) {
@@ -79,23 +81,40 @@ $targetLocationId = null;
 $targetTitle      = '';
 $targetLat        = null;
 $targetLon        = null;
+$targetGeojson    = null;
 
 if ($waybill) {
-    if ($action === 'start_trip') {
+    if ($action === 'start') {
         $targetLocationId = (int)$waybill['origin_location_id'];
         $targetTitle      = $waybill['origin_title'];
         $targetLat        = (float)$waybill['origin_lat'];
         $targetLon        = (float)$waybill['origin_lon'];
+        $rawGeojson       = $waybill['origin_geojson'];
     } else {
         $targetLocationId = (int)$waybill['destination_location_id'];
         $targetTitle      = $waybill['destination_title'];
         $targetLat        = (float)$waybill['destination_lat'];
         $targetLon        = (float)$waybill['destination_lon'];
+        $rawGeojson       = $waybill['destination_geojson'];
+    }
+
+    if (!empty($rawGeojson)) {
+        $decoded = json_decode((string)$rawGeojson, true);
+        if (is_array($decoded)) {
+            $targetGeojson = $decoded;
+        }
     }
 }
 
-$actionLabel  = $action === 'end_trip' ? 'پایان سفر' : 'شروع سفر';
-$actionButton = $action === 'end_trip' ? 'ثبت پایان سفر' : 'ثبت شروع سفر';
+$actionLabel  = $action === 'end' ? 'پایان سفر' : 'شروع سفر';
+$actionButton = $action === 'end' ? 'ثبت پایان سفر' : 'ثبت شروع سفر';
+
+// لینک بازگشت به فهرست بارنامه‌ها؛ چون این صفحه دیگر توکن اصلی driver_waybills
+// را در URL ندارد (فقط توکن یک‌بارمصرف عملیات)، برای بازگشت یک توکن تازه می‌سازیم
+$backUrl = BASE_URL . '/driver_waybills.php';
+if ($driver) {
+    $backUrl .= '?token=' . rawurlencode(create_access_token((int)$driver['id'], 'driver_waybills'));
+}
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -129,7 +148,7 @@ $actionButton = $action === 'end_trip' ? 'ثبت پایان سفر' : 'ثبت ش
     <span class="iconify fs-1 text-jade" data-icon="solar:map-point-search-bold"></span>
     <h1 class="h4 fw-bold mt-2 mb-1">بررسی حصار جغرافیایی — <?= e($actionLabel) ?></h1>
     <p class="text-muted small mb-0">
-      موقعیت فعلی شما گرفته می‌شود و با محدودهٔ مکان <?= $action === 'end_trip' ? 'مقصد' : 'مبدا' ?> مقایسه می‌گردد.
+      موقعیت فعلی شما گرفته می‌شود و با محدودهٔ مکان <?= $action === 'end' ? 'مقصد' : 'مبدا' ?> مقایسه می‌گردد.
     </p>
   </div>
 
@@ -143,7 +162,7 @@ $actionButton = $action === 'end_trip' ? 'ثبت پایان سفر' : 'ثبت ش
       </div>
     </div>
     <div class="text-center">
-      <a href="<?= BASE_URL ?>/driver_waybills.php?token=<?= e(rawurlencode($token)) ?>" class="btn btn-outline-secondary">
+      <a href="<?= e($backUrl) ?>" class="btn btn-outline-secondary">
         <span class="iconify" data-icon="solar:arrow-right-bold"></span> بازگشت به فهرست بارنامه‌ها
       </a>
     </div>
@@ -191,18 +210,13 @@ $actionButton = $action === 'end_trip' ? 'ثبت پایان سفر' : 'ثبت ش
               <span class="iconify" data-icon="solar:refresh-bold"></span> بررسی مجدد موقعیت
             </button>
 
-            <form method="post" action="<?= BASE_URL ?>/driver_waybills.php">
-              <input type="hidden" name="token" value="<?= e($token) ?>">
-              <input type="hidden" name="id" value="<?= e((string)$waybill['id']) ?>">
-              <input type="hidden" name="action" value="<?= e($action) ?>">
-              <button id="btnConfirm" type="submit" disabled
-                      class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
-                <span class="iconify" data-icon="solar:check-circle-bold"></span> <?= e($actionButton) ?>
-              </button>
-            </form>
+            <button id="btnConfirm" type="button" disabled
+                    class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
+              <span class="iconify" data-icon="solar:check-circle-bold"></span> <?= e($actionButton) ?>
+            </button>
 
             <div class="text-center mt-3">
-              <a href="<?= BASE_URL ?>/driver_waybills.php?token=<?= e(rawurlencode($token)) ?>" class="small text-muted">
+              <a href="<?= e($backUrl) ?>" class="small text-muted">
                 انصراف و بازگشت به فهرست بارنامه‌ها
               </a>
             </div>
@@ -226,18 +240,30 @@ $actionButton = $action === 'end_trip' ? 'ثبت پایان سفر' : 'ثبت ش
   var TARGET_LAT = <?= json_encode($targetLat) ?>;
   var TARGET_LON = <?= json_encode($targetLon) ?>;
   var TARGET_TITLE = <?= json_encode($targetTitle) ?>;
+  var TARGET_GEOJSON = <?= json_encode($targetGeojson) ?>;
   var CHECK_URL = '<?= BASE_URL ?>/map/geofence/check.php';
+  var LOADING_PAGE_URL = '<?= BASE_URL ?>/waybill_trip_loading.php';
+  var TOKEN = <?= json_encode($token) ?>; // همان توکن یک‌بارمصرفِ عملیات؛ تنها ورودی صفحهٔ لودینگ/وب‌سرویس
 
-  var resultDiv  = document.getElementById('result');
-  var btnConfirm = document.getElementById('btnConfirm');
-  var btnRecheck = document.getElementById('btnRecheck');
-  var lastLatLng = null;
-  var userMarker = null;
+  var resultDiv      = document.getElementById('result');
+  var btnConfirm      = document.getElementById('btnConfirm');
+  var btnRecheck      = document.getElementById('btnRecheck');
+  var lastLatLng      = null;
+  var userMarker      = null;
+  var insideGeofence  = false;
 
   function showResult(type, text) {
     resultDiv.className = 'alert alert-' + type;
     resultDiv.textContent = text;
   }
+
+  // تایید نهایی همیشه با کلیک دستی کاربر انجام می‌شود؛ با کلیک، کاربر به یک
+  // آدرس مجزا (صفحهٔ فقط-لودینگ) هدایت می‌شود که خودش با همین توکن به
+  // وب‌سرویس api/trip_action.php درخواست می‌زند.
+  btnConfirm.addEventListener('click', function () {
+    if (!insideGeofence || btnConfirm.disabled) return;
+    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN);
+  });
 
   // همان لایه‌های پایه و مقداردهی نقشه که در map/index.php استفاده شده
   var baseLayers = {
@@ -268,8 +294,17 @@ $actionButton = $action === 'end_trip' ? 'ثبت پایان سفر' : 'ثبت ش
     L.marker([TARGET_LAT, TARGET_LON]).addTo(map).bindPopup(TARGET_TITLE);
   }
 
+  // رسم محدودهٔ جغرافیایی (Geofence) مکان هدف، در صورت وجود GeoJSON
+  if (TARGET_GEOJSON) {
+    var fenceLayer = L.geoJSON(TARGET_GEOJSON, {
+      style: { color: '#6f42c1', weight: 2, fillOpacity: 0.15 }
+    }).addTo(map);
+    map.fitBounds(fenceLayer.getBounds());
+  }
+
   function checkGeofence(lat, lon) {
     showResult('secondary', 'در حال بررسی موقعیت نسبت به محدوده…');
+    insideGeofence = false;
     btnConfirm.disabled = true;
 
     fetch(CHECK_URL + '?id=' + TARGET_LOCATION_ID + '&lat=' + lat + '&lon=' + lon)
@@ -280,7 +315,8 @@ $actionButton = $action === 'end_trip' ? 'ثبت پایان سفر' : 'ثبت ش
           return;
         }
         if (data.inside) {
-          showResult('success', 'شما داخل محدودهٔ «' + data.name + '» هستید. اکنون می‌توانید ادامه دهید.');
+          showResult('success', 'شما داخل محدودهٔ «' + data.name + '» هستید. برای ادامه، دکمهٔ زیر را بزنید.');
+          insideGeofence = true;
           btnConfirm.disabled = false;
         } else {
           showResult('warning', 'شما هنوز داخل محدودهٔ «' + data.name + '» نیستید. به مکان مورد نظر نزدیک‌تر شوید و دوباره بررسی کنید.');
@@ -291,7 +327,22 @@ $actionButton = $action === 'end_trip' ? 'ثبت پایان سفر' : 'ثبت ش
       });
   }
 
+  // موقعیت‌یابی مرورگر (navigator.geolocation) فقط در «بستر امن» کار می‌کند:
+  // یعنی آدرس https:// یا localhost/127.0.0.1. اگر صفحه با آدرس http://IP
+  // (مثلاً از روی گوشی داخل شبکه محلی) باز شود، مرورگرها (به‌خصوص کروم روی
+  // اندروید) اصلاً درخواست را اجرا نمی‌کنند و بی‌سروصدا خطای PERMISSION_DENIED
+  // برمی‌گردانند؛ این شایع‌ترین دلیل «کار نکردن موقعیت مکانی روی گوشی» است.
+  var isSecureContext = window.isSecureContext === true ||
+    location.protocol === 'https:' ||
+    location.hostname === 'localhost' ||
+    location.hostname === '127.0.0.1';
+
   function locate() {
+    if (!isSecureContext) {
+      showResult('danger', 'برای دریافت موقعیت مکانی، این صفحه باید با آدرس https باز شود (مرورگرها موقعیت مکانی را روی http غیرمجاز می‌کنند). لطفاً از آدرس https همین سامانه استفاده کنید.');
+      return;
+    }
+
     if (!navigator.geolocation) {
       showResult('danger', 'مرورگر شما از موقعیت‌یابی پشتیبانی نمی‌کند.');
       return;
@@ -314,11 +365,17 @@ $actionButton = $action === 'end_trip' ? 'ثبت پایان سفر' : 'ثبت ش
 
       map.setView(lastLatLng, 15);
       checkGeofence(lastLatLng[0], lastLatLng[1]);
-    }, function () {
-      showResult('danger', 'دسترسی به موقعیت مکانی امکان‌پذیر نشد. GPS دستگاه خود را روشن کرده و اجازهٔ دسترسی به موقعیت را بدهید.');
+    }, function (err) {
+      var messages = {
+        1: 'اجازهٔ دسترسی به موقعیت مکانی داده نشد. آن را از تنظیمات مرورگر/گوشی برای این سایت فعال کنید.',
+        2: 'موقعیت مکانی در دسترس نیست. GPS گوشی را روشن کنید و دوباره تلاش کنید.',
+        3: 'زمان دریافت موقعیت مکانی به پایان رسید. لطفاً دوباره تلاش کنید.'
+      };
+      showResult('danger', messages[err.code] || 'دسترسی به موقعیت مکانی امکان‌پذیر نشد.');
     }, {
       enableHighAccuracy: true,
-      timeout: 15000
+      timeout: 20000,
+      maximumAge: 0
     });
   }
 

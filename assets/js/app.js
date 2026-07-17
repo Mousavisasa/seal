@@ -286,6 +286,254 @@
   }
 })();
 
+/* ---------- صفحه تست وب‌سرویس شروع/پایان سفر ---------- */
+(function () {
+  'use strict';
+  var tripSendBtn = document.getElementById('tripSendBtn');
+  var tripApiUrl = window.API_TRIP_ACTION_URL;
+  var mintTokenUrl = window.API_TEST_TRIP_TOKEN_URL;
+
+  // نمایش آدرس و نمونه‌کدهای مستندات با آدرس واقعی سرور (این بخش صرف‌نظر از
+  // اینکه بارنامه‌ای برای تست زنده موجود باشد یا نه، همیشه اجرا می‌شود)
+  var tripEndpointText = document.getElementById('tripEndpointText');
+  if (tripEndpointText && tripApiUrl) tripEndpointText.textContent = 'POST ' + tripApiUrl;
+
+  var tripCurlSample = document.getElementById('tripCurlSample');
+  if (tripCurlSample && tripApiUrl) tripCurlSample.textContent =
+    'curl -X POST "' + tripApiUrl + '" \\\n' +
+    '  -H "Content-Type: application/x-www-form-urlencoded" \\\n' +
+    '  --data-urlencode "token=<TOKEN>"';
+
+  var tripJsSample = document.getElementById('tripJsSample');
+  if (tripJsSample && tripApiUrl) tripJsSample.textContent =
+    'const res = await fetch("' + tripApiUrl + '", {\n' +
+    '  method: "POST",\n' +
+    '  headers: { "Content-Type": "application/x-www-form-urlencoded" },\n' +
+    '  body: "token=" + encodeURIComponent(token)\n' +
+    '});\n' +
+    'const data = await res.json();\n' +
+    'if (data.success) {\n' +
+    '  console.log("ثبت شد:", data.message);\n' +
+    '} else {\n' +
+    '  console.log("خطا:", data.message);\n' +
+    '}';
+
+  var tripPhpSample = document.getElementById('tripPhpSample');
+  if (tripPhpSample && tripApiUrl) tripPhpSample.textContent =
+    '$ch = curl_init("' + tripApiUrl + '");\n' +
+    'curl_setopt($ch, CURLOPT_POST, true);\n' +
+    'curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);\n' +
+    'curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([\n' +
+    '    "token" => $token,\n' +
+    ']));\n' +
+    '$response = curl_exec($ch);\n' +
+    '$status   = curl_getinfo($ch, CURLINFO_HTTP_CODE);\n' +
+    'curl_close($ch);\n' +
+    '$data = json_decode($response, true);';
+
+  if (!tripSendBtn) return; // بارنامه‌ای برای تست زنده وجود ندارد یا در این زیرصفحه نیستیم
+
+  var waybillSelect = document.getElementById('tripWaybillSelect');
+  var tripClearBtn  = document.getElementById('tripClearBtn');
+  var tripResultBox = document.getElementById('tripResultBox');
+  var tripTokenText = document.getElementById('tripTokenText');
+  var tripStatusBadge = document.getElementById('tripStatusBadge');
+  var tripTimeBadge = document.getElementById('tripTimeBadge');
+  var tripResponseEl = document.getElementById('tripResponse');
+
+  function showTripResult(status, body, ms, isNetworkError) {
+    if (!tripResultBox || !tripStatusBadge || !tripTimeBadge || !tripResponseEl) return;
+    tripResultBox.classList.remove('d-none');
+    tripStatusBadge.className = 'badge rounded-pill ' +
+      (isNetworkError ? 'badge-status-err'
+        : status >= 200 && status < 300 ? 'badge-status-ok'
+        : status >= 400 && status < 500 ? 'badge-status-warn'
+        : 'badge-status-err');
+    tripStatusBadge.textContent = isNetworkError ? 'خطای اتصال' : ('HTTP ' + status);
+    tripTimeBadge.textContent = 'زمان پاسخ: ' + ms + ' میلی‌ثانیه';
+    tripResponseEl.textContent = body;
+  }
+
+  tripSendBtn.addEventListener('click', function () {
+    var opt = waybillSelect.options[waybillSelect.selectedIndex];
+    if (!opt) return;
+    var waybillId = opt.value;
+    var action = opt.getAttribute('data-action');
+
+    tripSendBtn.disabled = true;
+    if (tripTokenText) tripTokenText.textContent = 'در حال ساخت توکن…';
+    var start = (window.performance && performance.now) ? performance.now() : Date.now();
+
+    fetch(mintTokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'waybill_id=' + encodeURIComponent(waybillId) + '&action=' + encodeURIComponent(action)
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (mintData) {
+        if (!mintData.success) {
+          if (tripTokenText) tripTokenText.textContent = '—';
+          var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+          showTripResult(0, 'خطا در ساخت توکن آزمایشی: ' + mintData.message, elapsed, true);
+          tripSendBtn.disabled = false;
+          return;
+        }
+
+        if (tripTokenText) tripTokenText.textContent = mintData.token;
+
+        fetch(tripApiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'token=' + encodeURIComponent(mintData.token)
+        })
+          .then(function (res) {
+            return res.text().then(function (text) {
+              var pretty = text;
+              try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch (e) {}
+              var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+              showTripResult(res.status, pretty, elapsed, false);
+              tripSendBtn.disabled = false;
+            });
+          })
+          .catch(function (err) {
+            var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+            showTripResult(0, 'اتصال به سرور برقرار نشد.\n\n' + (err && err.message ? err.message : ''), elapsed, true);
+            tripSendBtn.disabled = false;
+          });
+      })
+      .catch(function (err) {
+        var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+        showTripResult(0, 'اتصال به سرور برقرار نشد.\n\n' + (err && err.message ? err.message : ''), elapsed, true);
+        tripSendBtn.disabled = false;
+      });
+  });
+
+  if (tripClearBtn) {
+    tripClearBtn.addEventListener('click', function () {
+      if (tripResultBox) tripResultBox.classList.add('d-none');
+      if (tripResponseEl) tripResponseEl.textContent = '';
+      if (tripTokenText) tripTokenText.textContent = '';
+    });
+  }
+})();
+
+/* ---------- صفحه تست وب‌سرویس بارنامه فعال ---------- */
+(function () {
+  'use strict';
+  var activeSendBtn = document.getElementById('activeSendBtn');
+  var activeApiUrl = window.API_ACTIVE_WAYBILL_URL;
+  var mintDriverTokenUrl = window.API_TEST_DRIVER_TOKEN_URL;
+
+  // نمایش آدرس و نمونه‌کدهای مستندات با آدرس واقعی سرور (صرف‌نظر از اینکه
+  // راننده‌ای برای تست زنده موجود باشد یا نه، همیشه اجرا می‌شود)
+  var activeEndpointText = document.getElementById('activeEndpointText');
+  if (activeEndpointText && activeApiUrl) activeEndpointText.textContent = 'GET ' + activeApiUrl + '?token=...';
+
+  var activeCurlSample = document.getElementById('activeCurlSample');
+  if (activeCurlSample && activeApiUrl) activeCurlSample.textContent =
+    'curl -X GET "' + activeApiUrl + '?token=<TOKEN>"';
+
+  var activeJsSample = document.getElementById('activeJsSample');
+  if (activeJsSample && activeApiUrl) activeJsSample.textContent =
+    'const res = await fetch("' + activeApiUrl + '?token=" + encodeURIComponent(token));\n' +
+    'const data = await res.json();\n' +
+    'if (data.success && data.waybill) {\n' +
+    '  console.log("بارنامه فعال:", data.waybill);\n' +
+    '} else if (data.success) {\n' +
+    '  console.log("بارنامه فعالی وجود ندارد.");\n' +
+    '} else {\n' +
+    '  console.log("خطا:", data.message);\n' +
+    '}';
+
+  var activePhpSample = document.getElementById('activePhpSample');
+  if (activePhpSample && activeApiUrl) activePhpSample.textContent =
+    '$ch = curl_init("' + activeApiUrl + '?token=" . urlencode($token));\n' +
+    'curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);\n' +
+    '$response = curl_exec($ch);\n' +
+    '$status   = curl_getinfo($ch, CURLINFO_HTTP_CODE);\n' +
+    'curl_close($ch);\n' +
+    '$data = json_decode($response, true);';
+
+  if (!activeSendBtn) return; // راننده‌ای برای تست زنده وجود ندارد یا در این زیرصفحه نیستیم
+
+  var driverSelect = document.getElementById('activeDriverSelect');
+  var activeClearBtn = document.getElementById('activeClearBtn');
+  var activeResultBox = document.getElementById('activeResultBox');
+  var activeTokenText = document.getElementById('activeTokenText');
+  var activeStatusBadge = document.getElementById('activeStatusBadge');
+  var activeTimeBadge = document.getElementById('activeTimeBadge');
+  var activeResponseEl = document.getElementById('activeResponse');
+
+  function showActiveResult(status, body, ms, isNetworkError) {
+    if (!activeResultBox || !activeStatusBadge || !activeTimeBadge || !activeResponseEl) return;
+    activeResultBox.classList.remove('d-none');
+    activeStatusBadge.className = 'badge rounded-pill ' +
+      (isNetworkError ? 'badge-status-err'
+        : status >= 200 && status < 300 ? 'badge-status-ok'
+        : status >= 400 && status < 500 ? 'badge-status-warn'
+        : 'badge-status-err');
+    activeStatusBadge.textContent = isNetworkError ? 'خطای اتصال' : ('HTTP ' + status);
+    activeTimeBadge.textContent = 'زمان پاسخ: ' + ms + ' میلی‌ثانیه';
+    activeResponseEl.textContent = body;
+  }
+
+  activeSendBtn.addEventListener('click', function () {
+    var driverId = driverSelect.value;
+    if (!driverId) return;
+
+    activeSendBtn.disabled = true;
+    if (activeTokenText) activeTokenText.textContent = 'در حال ساخت توکن…';
+    var start = (window.performance && performance.now) ? performance.now() : Date.now();
+
+    fetch(mintDriverTokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'driver_id=' + encodeURIComponent(driverId)
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (mintData) {
+        if (!mintData.success) {
+          if (activeTokenText) activeTokenText.textContent = '—';
+          var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+          showActiveResult(0, 'خطا در ساخت توکن آزمایشی: ' + mintData.message, elapsed, true);
+          activeSendBtn.disabled = false;
+          return;
+        }
+
+        if (activeTokenText) activeTokenText.textContent = mintData.token;
+
+        fetch(activeApiUrl + '?token=' + encodeURIComponent(mintData.token))
+          .then(function (res) {
+            return res.text().then(function (text) {
+              var pretty = text;
+              try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch (e) {}
+              var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+              showActiveResult(res.status, pretty, elapsed, false);
+              activeSendBtn.disabled = false;
+            });
+          })
+          .catch(function (err) {
+            var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+            showActiveResult(0, 'اتصال به سرور برقرار نشد.\n\n' + (err && err.message ? err.message : ''), elapsed, true);
+            activeSendBtn.disabled = false;
+          });
+      })
+      .catch(function (err) {
+        var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+        showActiveResult(0, 'اتصال به سرور برقرار نشد.\n\n' + (err && err.message ? err.message : ''), elapsed, true);
+        activeSendBtn.disabled = false;
+      });
+  });
+
+  if (activeClearBtn) {
+    activeClearBtn.addEventListener('click', function () {
+      if (activeResultBox) activeResultBox.classList.add('d-none');
+      if (activeResponseEl) activeResponseEl.textContent = '';
+      if (activeTokenText) activeTokenText.textContent = '';
+    });
+  }
+})();
+
 /* ---------- تقویم شمسی برای فیلدهای تاریخ ---------- */
 (function () {
   'use strict';
@@ -548,4 +796,76 @@ document.addEventListener('visibilitychange', function () {
 
   originSelect.addEventListener('change', autoFillDistance);
   destSelect.addEventListener('change', autoFillDistance);
+})();
+
+/* ---------- کادر کد: افزودن نوار زبان برنامه‌نویسی + دکمه کپی به تمام کادرهای کد ---------- */
+(function () {
+  'use strict';
+
+  var LANG_LABELS = {
+    curl: 'cURL',
+    javascript: 'JavaScript',
+    php: 'PHP',
+    json: 'JSON'
+  };
+
+  function copyToClipboard(text, onDone) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { onDone(true); }).catch(function () { onDone(false); });
+      return;
+    }
+    // جایگزین برای مرورگرهایی که از Clipboard API پشتیبانی نمی‌کنند
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    onDone(ok);
+  }
+
+  document.querySelectorAll('pre[data-lang]').forEach(function (pre) {
+    if (pre.closest('.code-block')) return; // قبلاً پیچیده شده
+
+    var lang = pre.getAttribute('data-lang') || '';
+    var label = LANG_LABELS[lang] || lang.toUpperCase();
+
+    var wrapper = document.createElement('div');
+    wrapper.className = 'code-block';
+
+    var toolbar = document.createElement('div');
+    toolbar.className = 'code-block-toolbar';
+
+    var langSpan = document.createElement('span');
+    langSpan.className = 'code-block-lang';
+    langSpan.textContent = label;
+
+    var copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'code-block-copy-btn';
+    copyBtn.textContent = 'کپی';
+
+    copyBtn.addEventListener('click', function () {
+      copyToClipboard(pre.textContent || '', function (ok) {
+        copyBtn.classList.toggle('copied', ok);
+        copyBtn.textContent = ok ? 'کپی شد' : 'کپی';
+        if (ok) {
+          setTimeout(function () {
+            copyBtn.classList.remove('copied');
+            copyBtn.textContent = 'کپی';
+          }, 1500);
+        }
+      });
+    });
+
+    toolbar.appendChild(langSpan);
+    toolbar.appendChild(copyBtn);
+
+    pre.parentNode.insertBefore(wrapper, pre);
+    wrapper.appendChild(toolbar);
+    wrapper.appendChild(pre);
+  });
 })();

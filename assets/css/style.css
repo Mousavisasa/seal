@@ -342,6 +342,61 @@ body { background: var(--surface); color: var(--ink); }
 .badge-status-err  { background: #b02a37; color: #fff; }
 .badge-status-warn { background: #997404; color: #fff; }
 
+/* ---------- کادر کد با نوار زبان برنامه‌نویسی + دکمه کپی ---------- */
+/* یک کادر واحد: نوار عنوان و بدنه کد هر دو داخل همان جعبه با پس‌زمینه و حاشیه یکسان */
+.code-block {
+  position: relative;
+  margin-bottom: 1rem;
+  background: #1e1b32;
+  border-radius: .8rem;
+  border-inline-start: 4px solid var(--jade);
+  overflow: hidden;
+}
+.code-block-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  background: transparent;
+  color: #9a93b8;
+  padding: .55rem 1.1rem;
+  font-size: .78rem;
+  font-family: 'Consolas', 'Courier New', monospace;
+  direction: ltr;
+  border-bottom: 1px solid rgba(255, 255, 255, .1);
+}
+.code-block-lang {
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.code-block-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 0;
+  font-size: .78rem;
+  line-height: 1.4;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color .15s ease;
+}
+.code-block-copy-btn:hover { color: #fff; }
+.code-block-copy-btn.copied { color: var(--jade); }
+.code-block .api-doc-code,
+.code-block .api-response {
+  background: transparent;
+  border-radius: 0;
+  border-inline-start: none;
+  margin: 0;
+}
+
 /* ---------- ماژول بارنامه سوخت ---------- */
 .status-badge { font-weight: 600; font-size: .78rem; padding: .4em .8em; border-radius: 2rem; color: #fff; }
 .status-registered { background: var(--purple-dark); }
