@@ -58,3 +58,8 @@ const PRODUCT_COLORS = [
 
 // کلید API نقشه (map.ir) — منبع واحد؛ در سمت کلاینت از طریق window.MAPIR_API_KEY در دسترس است
 define('MAPIR_API_KEY', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImp0aSI6ImQ2ZDdlYjQ4MTFhNjU4ZTliMjk0YTdlZGVmMzVmZjQxOWU3NjBkOWM5MzQxMzM4YmJjODk1MzVkOTFkYzM1NGQzZWQ1YjFmMDZiODY3ZWQzIn0.eyJhdWQiOiI0Mjc1MyIsImp0aSI6ImQ2ZDdlYjQ4MTFhNjU4ZTliMjk0YTdlZGVmMzVmZjQxOWU3NjBkOWM5MzQxMzM4YmJjODk1MzVkOTFkYzM1NGQzZWQ1YjFmMDZiODY3ZWQzIiwiaWF0IjoxNzg0MDE5MjIxLCJuYmYiOjE3ODQwMTkyMjEsImV4cCI6MTc4NjYxMTIyMSwic3ViIjoiIiwic2NvcGVzIjpbImJhc2ljIl19.Pq3H-95Me7bYUojFvjh0G1I4c6XW6JgvwddnzqCAa2rJ5VOa-iuwbtbhRBh49F3Gffx3bX1Oomjz2DEPEql3cwrp33gJn7QNAR9tTQHnly1CmvzxIkuAPzHlO7K-h3l1jY1h_D-ll6jkNHIo-iTgMV6yYQOE5IYrLJD0HQsa8nKT0FDX-MZJ59QSPaxrhvOe-g2tzkQa-gLJmTTcB93CqMIGyQ8F8wRd18v5NIY17Rdm4UWGPrT3KlnELD-JYKlZVbNc1x4A25PuZK3CWTE7QxQF6jzYXBprD1sb6FbZF8cgevq157xFJHzz6u6LBZ1Ja6dwQcERICiloNLKKJZ6Dw');
+
+// کلید API این endpointها؛ خالی یعنی احراز هویت غیرفعال است
+if (!defined('API_KEY')) {
+    define('API_KEY', '');
+}

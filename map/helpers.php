@@ -8,7 +8,7 @@
  *  - الگوریتم پرتوافکنی (Ray casting) برای point-in-polygon
  */
 
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/../config/db.php';
 
 /* ---------- هدرها و CORS ---------- */
 header('Content-Type: application/json; charset=utf-8');
