@@ -750,6 +750,10 @@ require __DIR__ . '/includes/header.php';
               <td>شناسه پلمپ تخصیص‌یافته به بارنامه</td>
             </tr>
             <tr>
+              <td><code>waybill.seal_password</code></td><td>رشته یا <code>null</code></td><td>—</td>
+              <td>رمز/کد پلمپ (هش‌شده، ذخیره‌شده روی سرور)</td>
+            </tr>
+            <tr>
               <td><code>waybill.service_uuid</code></td><td>رشته یا <code>null</code></td><td>—</td>
               <td>Service UUID پلمپ (برای ارتباط BLE)</td>
             </tr>
