@@ -9,15 +9,16 @@ require_once __DIR__ . '/../helpers/seals.php';
 require_seals_master_access();
 
 $errors = [];
-$old = ['seal_id' => '', 'seal_password' => '', 'seal_password_confirm' => ''];
+$old = ['seal_id' => '', 'seal_password' => '', 'service_uuid' => '', 'characteristic_uuid' => ''];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf()) {
         $errors[] = 'نشست شما منقضی شده است. لطفاً فرم را دوباره ارسال کنید.';
     } else {
         $old['seal_id'] = trim((string)($_POST['seal_id'] ?? ''));
+        $old['service_uuid'] = trim((string)($_POST['service_uuid'] ?? ''));
+        $old['characteristic_uuid'] = trim((string)($_POST['characteristic_uuid'] ?? ''));
         $sealPassword = (string)($_POST['seal_password'] ?? '');
-        $sealPasswordConfirm = (string)($_POST['seal_password_confirm'] ?? '');
 
         if ($old['seal_id'] === '' || mb_strlen($old['seal_id']) > 50) {
             $errors[] = 'شناسه پلمپ الزامی است و باید حداکثر ۵۰ کاراکتر باشد.';
@@ -25,8 +26,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (strlen($sealPassword) < 4) {
             $errors[] = 'رمز پلمپ باید حداقل ۴ کاراکتر باشد.';
         }
-        if ($sealPassword !== $sealPasswordConfirm) {
-            $errors[] = 'رمز پلمپ و تکرار آن یکسان نیستند.';
+        if ($old['service_uuid'] === '' || mb_strlen($old['service_uuid']) > 100) {
+            $errors[] = 'Service UUID الزامی است و باید حداکثر ۱۰۰ کاراکتر باشد.';
+        }
+        if ($old['characteristic_uuid'] === '' || mb_strlen($old['characteristic_uuid']) > 100) {
+            $errors[] = 'Characteristic UUID الزامی است و باید حداکثر ۱۰۰ کاراکتر باشد.';
         }
 
         if (!$errors) {
@@ -37,11 +41,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $errors[] = 'پلمپی با این شناسه قبلاً ثبت شده است.';
                 } else {
                     $stmt = db()->prepare(
-                        'INSERT INTO seals (seal_id, seal_password, seal_status, created_by) VALUES (?, ?, ?, ?)'
+                        'INSERT INTO seals (seal_id, seal_password, service_uuid, characteristic_uuid, seal_status, created_by)
+                         VALUES (?, ?, ?, ?, ?, ?)'
                     );
                     $stmt->execute([
                         $old['seal_id'],
                         password_hash($sealPassword, PASSWORD_DEFAULT),
+                        $old['service_uuid'],
+                        $old['characteristic_uuid'],
                         'در انبار مرکزی',
                         (int)($_SESSION['user_id'] ?? 0),
                     ]);
@@ -97,8 +104,6 @@ require __DIR__ . '/../includes/header.php';
           </div>
         </div>
 
-        <div class="col-md-6"></div>
-
         <div class="col-md-6">
           <label class="form-label" for="seal_password">رمز پلمپ</label>
           <div class="input-group">
@@ -111,10 +116,18 @@ require __DIR__ . '/../includes/header.php';
         </div>
 
         <div class="col-md-6">
-          <label class="form-label" for="seal_password_confirm">تکرار رمز پلمپ</label>
+          <label class="form-label" for="service_uuid">شناسه سرویس (Service UUID)</label>
           <div class="input-group">
-            <span class="input-group-text"><span class="iconify" data-icon="solar:lock-password-bold"></span></span>
-            <input type="password" class="form-control ltr-text" id="seal_password_confirm" name="seal_password_confirm" required minlength="4" placeholder="تکرار رمز">
+            <span class="input-group-text"><span class="iconify" data-icon="mdi:bluetooth"></span></span>
+            <input type="text" class="form-control ltr-text" id="service_uuid" name="service_uuid" required maxlength="100" value="<?= e($old['service_uuid']) ?>" placeholder="مثلاً 0000180f-0000-1000-8000-00805f9b34fb">
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label" for="characteristic_uuid">شناسه مشخصه (Characteristic UUID)</label>
+          <div class="input-group">
+            <span class="input-group-text"><span class="iconify" data-icon="mdi:bluetooth-audio"></span></span>
+            <input type="text" class="form-control ltr-text" id="characteristic_uuid" name="characteristic_uuid" required maxlength="100" value="<?= e($old['characteristic_uuid']) ?>" placeholder="مثلاً 00002a19-0000-1000-8000-00805f9b34fb">
           </div>
         </div>
       </div>
