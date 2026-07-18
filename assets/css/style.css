@@ -399,6 +399,17 @@ body { background: var(--surface); color: var(--ink); }
   margin: 0;
   padding: 16px;
 }
+
+/* ---------- نمایش شماره سطر در کادرهای کد ---------- */
+.code-with-lines { display: flex; align-items: flex-start; gap: 12px; }
+.line-numbers { background: #12121a; color: #8fbfad; padding: 12px 10px; border-right: 1px solid rgba(255,255,255,.03); user-select: none; }
+.line-numbers ol { margin: 0; padding: 0; list-style: none; }
+.line-numbers li { padding: 0; line-height: 1.7; font-size: .85rem; text-align: right; font-family: 'Consolas', 'Courier New', monospace; }
+.code-with-lines pre { margin: 0; padding-left: 6px; font-family: 'Consolas', 'Courier New', monospace; overflow: auto; }
+/* Make gutter visually match code block */
+.code-block .code-with-lines .line-numbers { background: transparent; border-right: none; padding-inline-end: 8px; color: #9bdab0; }
+/* Responsive: hide line numbers on very small screens */
+@media (max-width: 480px) { .line-numbers { display: none; } }
 /* Prism نباید پس‌زمینه/حاشیه خودش را روی کادرهای ما اعمال کند */
 .code-block pre[class*="language-"],
 .code-block code[class*="language-"] {

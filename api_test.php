@@ -867,4 +867,55 @@ window.API_ACTIVE_WAYBILL_URL = <?= json_encode((isset($_SERVER['HTTPS']) && $_S
 window.API_TEST_DRIVER_TOKEN_URL = <?= json_encode(BASE_URL . '/api_test_driver_token.php') ?>;
 </script>
 
+<script>
+(function(){
+  function addLineNumbersTo(pre){
+    if(!pre || pre.dataset.hasLineNums) return;
+    pre.dataset.hasLineNums = '1';
+    var codeText = pre.textContent || '';
+    var lines = codeText.split('\n');
+    var wrapper = document.createElement('div');
+    wrapper.className = 'code-with-lines';
+    var gutter = document.createElement('div');
+    gutter.className = 'line-numbers';
+    var ol = document.createElement('ol');
+    for(var i=1;i<=lines.length;i++){ var li = document.createElement('li'); li.textContent = i; ol.appendChild(li); }
+    gutter.appendChild(ol);
+    // move pre into wrapper after gutter
+    var parent = pre.parentNode;
+    parent.insertBefore(wrapper, pre);
+    wrapper.appendChild(gutter);
+    wrapper.appendChild(pre);
+    // ensure monospace
+    pre.style.fontFamily = "Consolas, 'Courier New', monospace";
+    // observe changes to update line numbers
+    var mo = new MutationObserver(function(){
+      var newLines = (pre.textContent || '').split('\n').length;
+      if(ol.children.length !== newLines){
+        ol.innerHTML = '';
+        for(var j=1;j<=newLines;j++){ var li2=document.createElement('li'); li2.textContent=j; ol.appendChild(li2); }
+      }
+    });
+    mo.observe(pre, {characterData:true, childList:true, subtree:true});
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    var pres = document.querySelectorAll('pre.ltr-code, pre.api-response, pre.api-doc-code');
+    pres.forEach(addLineNumbersTo);
+    // observe new pre elements dynamically
+    var bodyMo = new MutationObserver(function(muts){
+      muts.forEach(function(m){
+        m.addedNodes.forEach(function(node){
+          if(node.nodeType===1){
+            if(node.matches && node.matches('pre.ltr-code, pre.api-response, pre.api-doc-code')) addLineNumbersTo(node);
+            var inners = node.querySelectorAll && node.querySelectorAll('pre.ltr-code, pre.api-response, pre.api-doc-code');
+            inners && inners.forEach(addLineNumbersTo);
+          }
+        });
+      });
+    });
+    bodyMo.observe(document.body, {childList:true, subtree:true});
+  });
+})();
+</script>
+
 <?php require __DIR__ . '/includes/footer.php'; ?>
