@@ -408,6 +408,13 @@ body { background: var(--surface); color: var(--ink); }
 .code-with-lines pre { margin: 0; padding-left: 6px; font-family: 'Consolas', 'Courier New', monospace; overflow: auto; }
 /* Make gutter visually match code block */
 .code-block .code-with-lines .line-numbers { background: transparent; border-right: none; padding-inline-end: 8px; color: #9bdab0; }
+/* Ensure code block gutter is on the left and code fills remaining space */
+.code-with-lines { display: flex; align-items: flex-start; gap: 12px; direction: ltr; justify-content: flex-start; width: 100%; }
+.code-with-lines .line-numbers { order: 0; flex: 0 0 auto; padding: 12px 12px 12px 8px; text-align: left; }
+.code-with-lines .line-numbers ol { margin: 0; padding: 0; list-style: none; }
+.code-with-lines .line-numbers li { padding: 0; line-height: 1.7; font-size: .85rem; text-align: left; font-family: 'Consolas', 'Courier New', monospace; color: inherit; }
+.code-with-lines pre { order: 1; margin: 0; padding: 12px; flex: 1 1 auto; font-family: 'Consolas', 'Courier New', monospace !important; overflow: auto; text-align: left; }
+@media (max-width: 480px) { .line-numbers { display: none; } }
 /* Responsive: hide line numbers on very small screens */
 @media (max-width: 480px) { .line-numbers { display: none; } }
 /* Prism نباید پس‌زمینه/حاشیه خودش را روی کادرهای ما اعمال کند */
