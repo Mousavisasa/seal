@@ -138,6 +138,8 @@ CREATE TABLE IF NOT EXISTS `seals` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `seal_id` VARCHAR(50) NOT NULL,
   `seal_password` VARCHAR(255) NOT NULL,
+  `service_uuid` VARCHAR(100) NULL DEFAULT NULL,
+  `characteristic_uuid` VARCHAR(100) NULL DEFAULT NULL,
   `seal_status` ENUM('در انبار مرکزی','در انبار منطقه','الصاق شده','باطل شده','مفقود شده') NOT NULL DEFAULT 'در انبار مرکزی',
   `region_id` INT NULL DEFAULT NULL,
   `fuel_waybill_id` INT UNSIGNED NULL DEFAULT NULL,
@@ -280,5 +282,10 @@ INSERT INTO `seals` (`seal_id`, `seal_password`, `seal_status`, `region_id`, `cr
 -- ALTER TABLE `users`
 --   ADD COLUMN `selected_waybill_id` INT UNSIGNED NULL DEFAULT NULL AFTER `is_active`,
 --   ADD KEY `idx_users_selected_waybill` (`selected_waybill_id`);
+--
+-- 7) افزودن شناسه‌های سرویس/مشخصهٔ بلوتوث (BLE) پلمپ:
+-- ALTER TABLE `seals`
+--   ADD COLUMN `service_uuid` VARCHAR(100) NULL DEFAULT NULL AFTER `seal_password`,
+--   ADD COLUMN `characteristic_uuid` VARCHAR(100) NULL DEFAULT NULL AFTER `service_uuid`;
 
 
