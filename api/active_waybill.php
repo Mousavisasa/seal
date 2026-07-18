@@ -78,7 +78,7 @@ try {
                     dl.title AS destination_title, dl.lat AS destination_lat, dl.lon AS destination_lon,
                     opOrig.first_name AS origin_operator_first, opOrig.last_name AS origin_operator_last,
                     opDest.first_name AS dest_operator_first, opDest.last_name AS dest_operator_last,
-                    sl.seal_id AS attached_seal_id
+                    sl.seal_id AS attached_seal_id, sl.service_uuid AS service_uuid, sl.characteristic_uuid AS characteristic_uuid
              FROM fuel_waybills w
              INNER JOIN locations ol ON ol.id = w.origin_location_id
              INNER JOIN locations dl ON dl.id = w.destination_location_id
@@ -114,6 +114,8 @@ try {
         'origin_operator'      => $w['origin_operator_first'] ? trim($w['origin_operator_first'] . ' ' . $w['origin_operator_last']) : null,
         'destination_operator' => $w['dest_operator_first'] ? trim($w['dest_operator_first'] . ' ' . $w['dest_operator_last']) : null,
         'seal_id'              => $w['attached_seal_id'],
+        'service_uuid'         => $w['service_uuid'],
+        'characteristic_uuid'  => $w['characteristic_uuid'],
     ];
 
     json_response(200, true, 'بارنامه ی انتخاب شده با موفقیت دریافت شد.', $waybill, true);

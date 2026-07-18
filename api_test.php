@@ -749,6 +749,14 @@ require __DIR__ . '/includes/header.php';
               <td><code>waybill.seal_id</code></td><td>رشته یا <code>null</code></td><td>—</td>
               <td>شناسه پلمپ تخصیص‌یافته به بارنامه</td>
             </tr>
+            <tr>
+              <td><code>waybill.service_uuid</code></td><td>رشته یا <code>null</code></td><td>—</td>
+              <td>Service UUID پلمپ (برای ارتباط BLE)</td>
+            </tr>
+            <tr>
+              <td><code>waybill.characteristic_uuid</code></td><td>رشته یا <code>null</code></td><td>—</td>
+              <td>Characteristic UUID پلمپ (برای خواندن/نوشتن روی دستگاه)</td>
+            </tr>
           </tbody>
         </table>
       </div>
