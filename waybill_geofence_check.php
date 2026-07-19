@@ -131,10 +131,11 @@ if ($driver) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>بررسی حصار جغرافیایی <?= e($actionLabel) ?> | <?= e(APP_NAME) ?></title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/vazirmatn.css">
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
+<script src="<?= BASE_URL ?>/assets/js/iconify.min.js"></script>
+<script src="<?= BASE_URL ?>/assets/js/iconify-icons.js"></script>
 <style>
   #map { height: 420px; border-radius: .75rem; z-index: 0; }
   .my-location-dot {

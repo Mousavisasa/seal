@@ -55,9 +55,10 @@ $flash = get_flash();
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ورود به پنل | <?= e(APP_NAME) ?></title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/vazirmatn.css">
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
-<script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
+<script src="<?= BASE_URL ?>/assets/js/iconify.min.js"></script>
+<script src="<?= BASE_URL ?>/assets/js/iconify-icons.js"></script>
 </head>
 <body class="auth-body">
 

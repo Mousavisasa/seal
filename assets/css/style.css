@@ -286,11 +286,11 @@ body { background: var(--surface); color: var(--ink); }
   font-size: 1.6rem;
   flex-shrink: 0;
 }
-.stat-jade { background: linear-gradient(135deg, #ffffff 60%, var(--jade-soft)); }
+.stat-jade { background: linear-gradient(-135deg, #ffffff 60%, #cbf6e7); }
 .stat-jade .stat-icon { background: var(--jade-soft); color: var(--jade-dark); }
-.stat-purple { background: linear-gradient(135deg, #ffffff 60%, var(--purple-soft)); }
+.stat-purple { background: linear-gradient(-135deg, #ffffff 60%, #eadcff); }
 .stat-purple .stat-icon { background: var(--purple-soft); color: var(--purple-dark); }
-.stat-number { font-size: 1.6rem; font-weight: 800; line-height: 1.1; }
+.stat-number { font-size: 1.6rem; font-weight: 800; line-height: 1.1;font-feature-settings: "ss01"; }
 .stat-label { color: var(--dim); font-size: .85rem; }
 
 /* ---------- جدول ---------- */
@@ -308,7 +308,7 @@ body { background: var(--surface); color: var(--ink); }
 .ltr-text { direction: ltr; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ---------- نشان نقش ---------- */
-.role-badge { font-weight: 600; font-size: .78rem; padding: .4em .8em; border-radius: 2rem; color: #fff; }
+.role-badge { font-weight: 600; font-size: .78rem; padding: .4em .8em; border-radius: 2rem; color: #ffffff; }
 .role-admin    { background: var(--purple-dark); }
 .role-driver   { background: var(--jade-dark); }
 .role-operator { background: #b26a00; }
@@ -456,8 +456,8 @@ body { background: var(--surface); color: var(--ink); }
 .table-total-row td { border-top: 2px solid #eef1f0; background: #fafcfb; }
 .dashboard-role-badge {
   display: inline-flex; align-items: center; gap: .4rem;
-  background: linear-gradient(90deg, var(--jade-dark), var(--purple-dark));
-  color: #fff;
+  background: linear-gradient(90deg, var(--jade-soft), var(--purple-soft));
+  color: #000000;
   padding: .35rem .9rem;
   border-radius: 2rem;
   font-size: .82rem;

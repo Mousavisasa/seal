@@ -21,7 +21,7 @@ $token = trim((string)($_GET['token'] ?? ''));
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>در حال ثبت درخواست… | <?= e(APP_NAME) ?></title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/vazirmatn.css">
 <style>
   html, body {
     height: 100%;
