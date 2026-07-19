@@ -51,11 +51,72 @@ try {
     error_log('api_test active drivers fetch error: ' . $e->getMessage());
 }
 
-// انتخاب زیرصفحه از URL (?service=login|trip|active) — یک ری‌لود واقعی صفحه،
-// نه فقط جابه‌جایی نمایشی با جاوااسکریپت، تا همیشه و بدون وابستگی به اجرای
-// اسکریپت سمت مرورگر کار کند.
+// بارنامه‌هایی که یک متصدی (مبدا یا مقصد) دارند و هنوز حضورش تایید نشده — برای
+// تست زنده وب‌سرویس تایید حضور متصدی (معادل شروع/پایان سفر راننده)
+$operatorPendingConfirm = [];
+try {
+    ensure_operator_confirm_columns();
+    $rows = db()->query(
+        "SELECT w.id, w.waybill_number, w.origin_operator_user_id, w.destination_operator_user_id,
+                w.origin_confirmed_at, w.destination_confirmed_at,
+                opOrig.first_name AS origin_first, opOrig.last_name AS origin_last, opOrig.national_code AS origin_nc,
+                opDest.first_name AS dest_first, opDest.last_name AS dest_last, opDest.national_code AS dest_nc
+         FROM fuel_waybills w
+         LEFT JOIN users opOrig ON opOrig.id = w.origin_operator_user_id
+         LEFT JOIN users opDest ON opDest.id = w.destination_operator_user_id
+         WHERE (w.origin_operator_user_id IS NOT NULL AND w.origin_confirmed_at IS NULL)
+            OR (w.destination_operator_user_id IS NOT NULL AND w.destination_confirmed_at IS NULL)
+         ORDER BY w.id DESC"
+    )->fetchAll();
+    foreach ($rows as $row) {
+        if ($row['origin_operator_user_id'] && !$row['origin_confirmed_at']) {
+            $operatorPendingConfirm[] = ['role' => 'origin', 'row' => $row];
+        }
+        if ($row['destination_operator_user_id'] && !$row['destination_confirmed_at']) {
+            $operatorPendingConfirm[] = ['role' => 'destination', 'row' => $row];
+        }
+    }
+} catch (PDOException $e) {
+    error_log('api_test operator pending confirm fetch error: ' . $e->getMessage());
+}
+
+// متصدی‌هایی که حداقل یک بارنامه به آن‌ها تخصیص یافته — برای تست زنده وب‌سرویس بارنامه‌های ایستگاه متصدی
+$operatorsWithWaybills = [];
+try {
+    $operatorsWithWaybills = db()->query(
+        "SELECT DISTINCT u.id, u.first_name, u.last_name, u.national_code
+         FROM users u
+         WHERE u.user_type = 'operator'
+           AND EXISTS (SELECT 1 FROM fuel_waybills w WHERE w.origin_operator_user_id = u.id OR w.destination_operator_user_id = u.id)
+         ORDER BY u.id DESC"
+    )->fetchAll();
+} catch (PDOException $e) {
+    error_log('api_test operators with waybills fetch error: ' . $e->getMessage());
+}
+
+// انتخاب نقش از URL (?role=driver|operator) — سوییچ بین مستندات راننده و متصدی
+$roleParam = (string)($_GET['role'] ?? '');
+$role = $roleParam === 'operator' ? 'operator' : 'driver';
+
+// انتخاب زیرصفحه از URL (?service=login|trip|active|webview|geofence|trip_action|active_waybill)
+// یک ری‌لود واقعی صفحه، نه فقط جابه‌جایی نمایشی با جاوااسکریپت، تا همیشه و
+// بدون وابستگی به اجرای اسکریپت سمت مرورگر کار کند.
 $serviceParam = (string)($_GET['service'] ?? '');
-$service = in_array($serviceParam, ['trip', 'active'], true) ? $serviceParam : 'login';
+if ($role === 'operator') {
+    $service = in_array($serviceParam, ['webview', 'geofence', 'trip_action', 'active_waybill'], true) ? $serviceParam : 'login';
+} else {
+    $service = in_array($serviceParam, ['trip', 'active'], true) ? $serviceParam : 'login';
+}
+
+// اپراتورهای واقعی برای اطلاع‌رسانی در مستندات (اولین کاربر operator فعال، برای نمونه آدرس‌دهی)
+$operatorTokenSampleUser = null;
+try {
+    $operatorTokenSampleUser = db()->query(
+        "SELECT id, first_name, last_name, national_code FROM users WHERE user_type = 'operator' AND is_active = 1 ORDER BY id ASC LIMIT 1"
+    )->fetch();
+} catch (PDOException $e) {
+    error_log('api_test operator sample fetch error: ' . $e->getMessage());
+}
 
 $page_title = 'مستندات و تست وب‌سرویس‌ها';
 $active = 'api';
@@ -69,20 +130,35 @@ require __DIR__ . '/includes/header.php';
 
 <?= render_flash() ?>
 
-<!-- ================= انتخاب وب‌سرویس ================= -->
+<!-- ================= انتخاب نقش (راننده / متصدی) ================= -->
+<ul class="nav nav-pills gap-2 mb-3" id="apiRoleTabs">
+  <li class="nav-item">
+    <a href="?role=driver" class="nav-link <?= $role === 'driver' ? 'active' : '' ?>">
+      <span class="iconify" data-icon="solar:bus-bold-duotone"></span> راننده
+    </a>
+  </li>
+  <li class="nav-item">
+    <a href="?role=operator" class="nav-link <?= $role === 'operator' ? 'active' : '' ?>">
+      <span class="iconify" data-icon="solar:buildings-3-bold-duotone"></span> متصدی
+    </a>
+  </li>
+</ul>
+
+<?php if ($role === 'driver'): ?>
+<!-- ================= انتخاب وب‌سرویس (راننده) ================= -->
 <ul class="nav nav-pills gap-2 mb-4" id="apiServiceTabs">
   <li class="nav-item">
-    <a href="?service=login" class="nav-link <?= $service === 'login' ? 'active' : '' ?>">
+    <a href="?role=driver&service=login" class="nav-link <?= $service === 'login' ? 'active' : '' ?>">
       <span class="iconify" data-icon="solar:login-3-bold"></span> وب‌سرویس ورود
     </a>
   </li>
   <li class="nav-item">
-    <a href="?service=trip" class="nav-link <?= $service === 'trip' ? 'active' : '' ?>">
+    <a href="?role=driver&service=trip" class="nav-link <?= $service === 'trip' ? 'active' : '' ?>">
       <span class="iconify" data-icon="solar:routing-2-bold"></span> وب‌سرویس شروع/پایان سفر
     </a>
   </li>
   <li class="nav-item">
-    <a href="?service=active" class="nav-link <?= $service === 'active' ? 'active' : '' ?>">
+    <a href="?role=driver&service=active" class="nav-link <?= $service === 'active' ? 'active' : '' ?>">
       <span class="iconify" data-icon="solar:document-text-bold"></span> وب‌سرویس بارنامه ی انتخاب شده
     </a>
   </li>
@@ -857,6 +933,641 @@ require __DIR__ . '/includes/header.php';
     </div>
   </div>
 </div>
+<?php endif; // پایان بخش راننده (role === 'driver') ?>
+
+<?php if ($role === 'operator'): ?>
+<!-- ================= انتخاب وب‌سرویس (متصدی) ================= -->
+<ul class="nav nav-pills gap-2 mb-4" id="apiOperatorServiceTabs">
+  <li class="nav-item">
+    <a href="?role=operator&service=login" class="nav-link <?= $service === 'login' ? 'active' : '' ?>">
+      <span class="iconify" data-icon="solar:login-3-bold"></span> وب‌سرویس ورود
+    </a>
+  </li>
+  <li class="nav-item">
+    <a href="?role=operator&service=webview" class="nav-link <?= $service === 'webview' ? 'active' : '' ?>">
+      <span class="iconify" data-icon="solar:widget-5-bold"></span> صفحهٔ عمومی (Webview)
+    </a>
+  </li>
+  <li class="nav-item">
+    <a href="?role=operator&service=geofence" class="nav-link <?= $service === 'geofence' ? 'active' : '' ?>">
+      <span class="iconify" data-icon="solar:map-point-search-bold"></span> وب‌سرویس حصار جغرافیایی
+    </a>
+  </li>
+  <li class="nav-item">
+    <a href="?role=operator&service=trip_action" class="nav-link <?= $service === 'trip_action' ? 'active' : '' ?>">
+      <span class="iconify" data-icon="solar:routing-2-bold"></span> وب‌سرویس تایید حضور متصدی
+    </a>
+  </li>
+  <li class="nav-item">
+    <a href="?role=operator&service=active_waybill" class="nav-link <?= $service === 'active_waybill' ? 'active' : '' ?>">
+      <span class="iconify" data-icon="solar:document-text-bold"></span> وب‌سرویس بارنامه‌های ایستگاه
+    </a>
+  </li>
+</ul>
+
+<!-- ================================================================= -->
+<!-- ==================== ۱) وب‌سرویس ورود (متصدی) ==================== -->
+<!-- ================================================================= -->
+<div class="api-service-panel <?= $service === 'login' ? '' : 'd-none' ?>" data-panel="op-login">
+  <div class="card panel-card">
+    <div class="card-body p-4">
+      <div class="alert alert-info d-flex align-items-start gap-2 mb-0">
+        <span class="iconify fs-5 mt-1" data-icon="solar:info-circle-bold"></span>
+        <div>
+          وب‌سرویس ورود متصدی همان <code class="ltr-code">api/login.php</code> است که در تب «راننده ← وب‌سرویس ورود»
+          مستند شده — این وب‌سرویس مستقل از نقش کاربر است و هر سه نقش (<code>driver</code>، <code>operator</code>، <code>region</code>)
+          را می‌پذیرد. تنها تفاوت، مقدار <code>user.user_type</code> در پاسخ موفق است که برای متصدی برابر
+          <code class="ltr-code">"operator"</code> خواهد بود. توکن صادرشده برای متصدی با پارامتر
+          <code>purpose = operator_waybills</code> ساخته و در سایر وب‌سرویس‌های این تب معتبر است (نه
+          <code>driver_waybills</code>).
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================= -->
+<!-- =============== ۲) صفحهٔ عمومی متصدی (Webview) =============== -->
+<!-- ================================================================= -->
+<div class="api-service-panel <?= $service === 'webview' ? '' : 'd-none' ?>" data-panel="op-webview">
+  <div class="card panel-card">
+    <div class="card-header d-flex align-items-center gap-2">
+      <span class="iconify text-purple fs-5" data-icon="solar:book-2-bold"></span>
+      <span class="fw-bold">مستندات صفحهٔ عمومی «Webview»</span>
+    </div>
+    <div class="card-body p-4">
+
+      <div class="alert alert-info d-flex align-items-start gap-2">
+        <span class="iconify fs-5 mt-1" data-icon="solar:info-circle-bold"></span>
+        <div>
+          «Webview» به صفحاتی گفته می‌شود که <strong>خارج از پنل اصلی ادمین</strong> قرار دارند، نیازی به
+          سشن/ورود به پنل ندارند، و معمولاً داخل یک WebView از اپلیکیشن موبایل (یا مرورگر گوشی) با یک
+          <strong>توکن</strong> در URL باز می‌شوند — نه با کوکی سشن. نمونهٔ اصلی این الگو برای راننده
+          <code class="ltr-code">driver_waybills.php</code> است؛ معادل آن برای متصدی
+          <code class="ltr-code">operator_waybills_public.php</code> است.
+        </div>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:link-circle-bold"></span> آدرس‌ها
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <tbody>
+            <tr>
+              <th class="w-25">صفحهٔ عمومی متصدی</th>
+              <td><code class="ltr-code"><?= BASE_URL ?>/operator_waybills_public.php?token=...</code></td>
+            </tr>
+            <tr>
+              <th>صفحهٔ عمومی راننده (برای مقایسه)</th>
+              <td><code class="ltr-code"><?= BASE_URL ?>/driver_waybills.php?token=...</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:routing-2-bold"></span> دو روش ورود
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr><th>روش</th><th>توضیح</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>۱) با توکن در URL</td>
+              <td>
+                توکن از طریق وب‌سرویس ورود (<code>api/login.php</code>، با <code>purpose = operator_waybills</code>)
+                گرفته می‌شود و به‌صورت <code class="ltr-code">?token=...</code> در URL ارسال می‌شود؛ حداکثر
+                <?= e((string)ACCESS_TOKEN_TTL_MINUTES) ?> دقیقه اعتبار دارد. این روش برای بازکردن صفحه از داخل
+                WebView اپلیکیشن مناسب است — چون رمز عبور در URL قرار نمی‌گیرد.
+              </td>
+            </tr>
+            <tr>
+              <td>۲) با فرم کد ملی/رمز عبور</td>
+              <td>
+                اگر توکن معتبر نباشد یا وجود نداشته باشد، فرم ورود مستقیم نمایش داده می‌شود. بعد از ورود موفق
+                (POST)، یک توکن تازه ساخته و کاربر با ری‌دایرکت به همان آدرس با <code>?token=...</code> هدایت
+                می‌شود تا از آن پس رمز عبور در هیچ درخواستی (از جمله تایید حضور) استفاده نشود.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:widget-5-bold"></span> رفتار صفحه
+      </h2>
+      <ul class="mb-4">
+        <li>فهرست بارنامه‌هایی که متصدی به‌عنوان متصدی مبدا یا مقصد آن تخصیص یافته را نشان می‌دهد.</li>
+        <li>برای هر بارنامه که هنوز حضور متصدی در آن تایید نشده، دکمهٔ «تایید حضور» نمایش داده می‌شود.</li>
+        <li>
+          کلیک روی «تایید حضور» کاربر را با یک توکن یک‌بارمصرف مخصوص همان عملیات
+          (<code>helpers/tokens.php::create_operator_action_token</code>) به صفحهٔ بررسی حصار جغرافیایی
+          (<code>waybill_operator_geofence_check.php</code>) می‌فرستد؛ همان الگویی که راننده برای شروع/پایان
+          سفر با <code>waybill_geofence_check.php</code> طی می‌کند.
+        </li>
+        <li>این صفحه هیچ کوکی/سشنی نمی‌سازد و مستقل از پنل ادمین قابل استفاده است.</li>
+      </ul>
+
+      <div class="text-center">
+        <a href="<?= BASE_URL ?>/operator_waybills_public.php" target="_blank" class="btn btn-outline-secondary d-flex align-items-center gap-2 d-inline-flex">
+          <span class="iconify" data-icon="solar:square-top-down-bold"></span> بازکردن صفحهٔ عمومی متصدی
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================= -->
+<!-- =============== ۳) وب‌سرویس حصار جغرافیایی =============== -->
+<!-- ================================================================= -->
+<div class="api-service-panel <?= $service === 'geofence' ? '' : 'd-none' ?>" data-panel="op-geofence">
+  <div class="card panel-card">
+    <div class="card-header d-flex align-items-center gap-2">
+      <span class="iconify text-purple fs-5" data-icon="solar:book-2-bold"></span>
+      <span class="fw-bold">مستندات وب‌سرویس حصار جغرافیایی</span>
+    </div>
+    <div class="card-body p-4">
+
+      <div class="alert alert-info d-flex align-items-start gap-2">
+        <span class="iconify fs-5 mt-1" data-icon="solar:info-circle-bold"></span>
+        <div>
+          این وب‌سرویس عمومی و مشترک بین راننده و متصدی است (به‌طور مستقیم به نقش کاربر وابسته نیست)؛
+          صفحهٔ <code class="ltr-code">waybill_operator_geofence_check.php</code> پیش از تایید نهاییِ
+          «تایید حضور متصدی» از همین وب‌سرویس برای بررسی داخل‌بودن موقعیت فعلی کاربر در محدودهٔ مکان
+          استفاده می‌کند (دقیقاً مانند <code>waybill_geofence_check.php</code> برای راننده).
+        </div>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:link-circle-bold"></span> آدرس و متد
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <tbody>
+            <tr>
+              <th class="w-25">آدرس (Endpoint)</th>
+              <td><code class="ltr-code" id="geofenceEndpointText"></code></td>
+            </tr>
+            <tr>
+              <th>متد</th>
+              <td><span class="badge role-badge role-admin">GET</span></td>
+            </tr>
+            <tr>
+              <th>نیازمند کلید؟</th>
+              <td>بله — این وب‌سرویس مانند بقیهٔ وب‌سرویس‌های داخلی نقشه با <code>require_key()</code> محافظت می‌شود.</td>
+            </tr>
+            <tr>
+              <th>خروجی</th>
+              <td>همیشه JSON با ساختار ثابت <code class="ltr-code">{ success, id, region_id, name, inside, point }</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:document-add-bold"></span> پارامترهای ورودی
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr><th>نام</th><th>نوع</th><th>الزامی</th><th>توضیح</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>id</code></td><td>عدد</td><td>بله</td><td>شناسهٔ مکان (locations.id) — مبدا یا مقصد بارنامه</td></tr>
+            <tr><td><code>lat</code></td><td>اعشاری</td><td>بله</td><td>عرض جغرافیایی موقعیت فعلی کاربر</td></tr>
+            <tr><td><code>lon</code></td><td>اعشاری</td><td>بله</td><td>طول جغرافیایی موقعیت فعلی کاربر</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:check-circle-bold"></span> نمونه پاسخ موفق
+      </h2>
+      <pre data-lang="json" class="api-doc-code ltr-code">{
+  "success": true,
+  "id": 12,
+  "region_id": 3,
+  "name": "انبار نفت مرکزی",
+  "inside": true,
+  "point": { "lat": 35.6892, "lon": 51.389 }
+}</pre>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2 mt-4">
+        <span class="iconify text-jade" data-icon="solar:command-bold"></span> نمونه فراخوانی با cURL
+      </h2>
+      <pre data-lang="curl" class="api-doc-code ltr-code" id="geofenceCurlSample"></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================= -->
+<!-- =============== ۴) وب‌سرویس تایید حضور متصدی =============== -->
+<!-- ================================================================= -->
+<div class="api-service-panel <?= $service === 'trip_action' ? '' : 'd-none' ?>" data-panel="op-trip-action">
+
+  <!-- ================= تست زنده ================= -->
+  <div class="card panel-card mb-4">
+    <div class="card-header d-flex align-items-center gap-2">
+      <span class="iconify text-jade fs-5" data-icon="solar:test-tube-bold"></span>
+      <span class="fw-bold">تست زنده اتصال</span>
+    </div>
+    <div class="card-body p-4">
+
+      <div class="alert alert-warning d-flex align-items-start gap-2">
+        <span class="iconify fs-5 mt-1" data-icon="solar:danger-triangle-bold"></span>
+        <div>
+          این تست روی <strong>بارنامه‌های واقعی</strong> اجرا می‌شود و «تایید حضور» متصدی را واقعاً ثبت می‌کند.
+          فقط روی بارنامه‌های تستی استفاده کنید.
+        </div>
+      </div>
+
+      <?php if (!$operatorPendingConfirm): ?>
+        <div class="text-muted small">در حال حاضر هیچ بارنامهٔ منتظر تایید حضور متصدی وجود ندارد.</div>
+      <?php else: ?>
+        <div class="row g-3 align-items-end">
+          <div class="col-md-8">
+            <label class="form-label" for="opTripWaybillSelect">بارنامه و نقش متصدی برای تست</label>
+            <select class="form-select" id="opTripWaybillSelect">
+              <?php foreach ($operatorPendingConfirm as $item): $row = $item['row']; $r = $item['role']; ?>
+                <option value="<?= e((string)$row['id']) ?>" data-role="<?= e($r) ?>">
+                  <?= $r === 'origin' ? 'تایید حضور مبدا' : 'تایید حضور مقصد' ?> — بارنامه <?= e($row['waybill_number']) ?> —
+                  متصدی <?= $r === 'origin' ? e($row['origin_first'] . ' ' . $row['origin_last'] . ' (' . $row['origin_nc'] . ')') : e($row['dest_first'] . ' ' . $row['dest_last'] . ' (' . $row['dest_nc'] . ')') ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-4">
+          <button type="button" class="btn btn-primary d-flex align-items-center gap-2" id="opTripSendBtn">
+            <span class="iconify fs-5" data-icon="solar:play-circle-bold"></span> ساخت توکن و ارسال درخواست
+          </button>
+          <button type="button" class="btn btn-outline-secondary d-flex align-items-center gap-2" id="opTripClearBtn">
+            <span class="iconify" data-icon="solar:eraser-bold"></span> پاک‌کردن نتیجه
+          </button>
+        </div>
+
+        <div id="opTripResultBox" class="mt-4 d-none">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span class="fw-bold">توکن یک‌بارمصرف ساخته‌شده:</span>
+            <code class="ltr-code" id="opTripTokenText"></code>
+          </div>
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span class="fw-bold">نتیجه:</span>
+            <span class="badge rounded-pill" id="opTripStatusBadge"></span>
+            <span class="text-muted small" id="opTripTimeBadge"></span>
+          </div>
+          <pre data-lang="json" class="api-response ltr-code mb-0" id="opTripResponse"></pre>
+        </div>
+      <?php endif; ?>
+    </div>
+  </div>
+
+  <!-- ================= مستندات ================= -->
+  <div class="card panel-card">
+    <div class="card-header d-flex align-items-center gap-2">
+      <span class="iconify text-purple fs-5" data-icon="solar:book-2-bold"></span>
+      <span class="fw-bold">مستندات وب‌سرویس تایید حضور متصدی</span>
+    </div>
+    <div class="card-body p-4">
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:link-circle-bold"></span> آدرس و متد
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <tbody>
+            <tr>
+              <th class="w-25">آدرس (Endpoint)</th>
+              <td><code class="ltr-code" id="opTripEndpointText"></code></td>
+            </tr>
+            <tr>
+              <th>متد</th>
+              <td><span class="badge role-badge role-admin">GET</span> یا <span class="badge role-badge role-admin">POST</span> (سایر متدها با کد <code>405</code> رد می‌شوند)</td>
+            </tr>
+            <tr>
+              <th>نوع ورودی</th>
+              <td><code>application/json</code>، <code>form-data</code> یا پارامتر GET</td>
+            </tr>
+            <tr>
+              <th>خروجی</th>
+              <td>همیشه JSON با ساختار ثابت <code class="ltr-code">{ success, message }</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:document-add-bold"></span> پارامترهای ورودی
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr><th>نام</th><th>نوع</th><th>الزامی</th><th>توضیح</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>token</code></td><td>رشته</td><td>بله</td>
+              <td>
+                <strong>تنها ورودی این وب‌سرویس.</strong> یک توکن یک‌بارمصرف ۶۴کاراکتری است که هم هویت/نقش
+                متصدی و هم نقش او در بارنامه (<code>origin</code> یا <code>destination</code>) و شناسه بارنامه
+                را در خودش دارد. این توکن هنگام کلیک روی دکمهٔ «تایید حضور» در صفحهٔ
+                <code>operator_waybills_public.php</code> ساخته می‌شود (تابع
+                <code>create_operator_action_token()</code>) و حداکثر <?= e((string)ACCESS_TOKEN_TTL_MINUTES) ?>
+                دقیقه و فقط یک‌بار قابل استفاده است.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:server-square-bold"></span> کدهای وضعیت HTTP
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr><th>کد</th><th>وضعیت</th><th>توضیح</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="badge role-badge role-driver">200</span></td><td>موفق</td><td>حضور متصدی با موفقیت تایید شد</td></tr>
+            <tr><td><span class="badge role-badge role-operator">401</span></td><td>عدم احراز</td><td>توکن نامعتبر است یا منقضی شده است</td></tr>
+            <tr><td><span class="badge role-badge role-operator">403</span></td><td>عدم دسترسی</td><td>توکن متعلق به متصدی نیست، حساب غیرفعال است، یا بارنامه به این متصدی تخصیص ندارد</td></tr>
+            <tr><td><span class="badge role-badge role-operator">404</span></td><td>یافت نشد</td><td>بارنامهٔ داخل توکن دیگر وجود ندارد</td></tr>
+            <tr><td><span class="badge role-badge role-region">405</span></td><td>متد غیرمجاز</td><td>فقط GET یا POST پذیرفته می‌شود</td></tr>
+            <tr><td><span class="badge role-badge role-operator">409</span></td><td>ناسازگاری وضعیت</td><td>حضور متصدی قبلاً تایید شده است</td></tr>
+            <tr><td><span class="badge role-badge role-operator">422</span></td><td>ورودی ناقص</td><td>توکن ارسال نشده است</td></tr>
+            <tr><td><span class="badge role-badge role-admin">500</span></td><td>خطای سرور</td><td>خطای داخلی؛ جزئیات فنی هرگز افشا نمی‌شود</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:check-circle-bold"></span> نمونه پاسخ موفق (200)
+      </h2>
+      <pre data-lang="json" class="api-doc-code ltr-code">{
+  "success": true,
+  "message": "حضور شما در مبدا با موفقیت تایید شد."
+}</pre>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2 mt-4">
+        <span class="iconify text-jade" data-icon="solar:close-circle-bold"></span> نمونه پاسخ ناموفق — ناسازگاری وضعیت (409)
+      </h2>
+      <pre data-lang="json" class="api-doc-code ltr-code">{
+  "success": false,
+  "message": "حضور شما برای این بارنامه قبلاً تایید شده است."
+}</pre>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2 mt-4">
+        <span class="iconify text-jade" data-icon="solar:command-bold"></span> نمونه فراخوانی با cURL
+      </h2>
+      <pre data-lang="curl" class="api-doc-code ltr-code" id="opTripCurlSample"></pre>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2 mt-4">
+        <span class="iconify text-jade" data-icon="logos:javascript"></span> نمونه فراخوانی با JavaScript (fetch)
+      </h2>
+      <pre data-lang="javascript" class="api-doc-code ltr-code" id="opTripJsSample"></pre>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2 mt-4">
+        <span class="iconify text-jade" data-icon="logos:php"></span> نمونه فراخوانی با PHP (cURL)
+      </h2>
+      <pre data-lang="php" class="api-doc-code ltr-code" id="opTripPhpSample"></pre>
+
+      <div class="alert alert-info d-flex align-items-start gap-2 mt-4 mb-0">
+        <span class="iconify fs-5 mt-1" data-icon="solar:info-circle-bold"></span>
+        <div>
+          <strong>نکات:</strong> برخلاف شروع/پایان سفر راننده، تایید حضور متصدی وضعیت (<code>send_status</code>)
+          بارنامه را تغییر نمی‌دهد؛ فقط زمان تایید حضور را در ستون <code>origin_confirmed_at</code> یا
+          <code>destination_confirmed_at</code> ثبت می‌کند. توکن یک‌بار مصرف است و بعد از فراخوانی موفق (یا
+          شکست به‌دلیل ناسازگاری وضعیت)، دیگر قابل استفادهٔ دوباره نیست.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================= -->
+<!-- =============== ۵) وب‌سرویس بارنامه‌های ایستگاه متصدی =============== -->
+<!-- ================================================================= -->
+<div class="api-service-panel <?= $service === 'active_waybill' ? '' : 'd-none' ?>" data-panel="op-active-waybill">
+
+  <!-- ================= تست زنده ================= -->
+  <div class="card panel-card mb-4">
+    <div class="card-header d-flex align-items-center gap-2">
+      <span class="iconify text-jade fs-5" data-icon="solar:test-tube-bold"></span>
+      <span class="fw-bold">تست زنده اتصال</span>
+    </div>
+    <div class="card-body p-4">
+
+      <?php if (!$operatorsWithWaybills): ?>
+        <div class="text-muted small">در حال حاضر هیچ متصدی‌ای بارنامهٔ تخصیص‌یافته ندارد.</div>
+      <?php else: ?>
+        <div class="row g-3 align-items-end">
+          <div class="col-md-8">
+            <label class="form-label" for="opActiveOperatorSelect">متصدی واقعی برای تست</label>
+            <select class="form-select" id="opActiveOperatorSelect">
+              <?php foreach ($operatorsWithWaybills as $op): ?>
+                <option value="<?= e((string)$op['id']) ?>">
+                  متصدی <?= e($op['first_name'] . ' ' . $op['last_name']) ?> (<?= e($op['national_code']) ?>)
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-4">
+          <button type="button" class="btn btn-primary d-flex align-items-center gap-2" id="opActiveSendBtn">
+            <span class="iconify fs-5" data-icon="solar:play-circle-bold"></span> دریافت توکن و ارسال درخواست
+          </button>
+          <button type="button" class="btn btn-outline-secondary d-flex align-items-center gap-2" id="opActiveClearBtn">
+            <span class="iconify" data-icon="solar:eraser-bold"></span> پاک‌کردن نتیجه
+          </button>
+        </div>
+
+        <div id="opActiveResultBox" class="mt-4 d-none">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span class="fw-bold">توکن متصدی مورد استفاده:</span>
+            <code class="ltr-code" id="opActiveTokenText"></code>
+          </div>
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span class="fw-bold">نتیجه:</span>
+            <span class="badge rounded-pill" id="opActiveStatusBadge"></span>
+            <span class="text-muted small" id="opActiveTimeBadge"></span>
+          </div>
+          <pre data-lang="json" class="api-response ltr-code mb-0" id="opActiveResponse"></pre>
+        </div>
+      <?php endif; ?>
+    </div>
+  </div>
+
+  <!-- ================= مستندات ================= -->
+  <div class="card panel-card">
+    <div class="card-header d-flex align-items-center gap-2">
+      <span class="iconify text-purple fs-5" data-icon="solar:book-2-bold"></span>
+      <span class="fw-bold">مستندات وب‌سرویس بارنامه‌های ایستگاه متصدی</span>
+    </div>
+    <div class="card-body p-4">
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:link-circle-bold"></span> آدرس و متد
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <tbody>
+            <tr>
+              <th class="w-25">آدرس (Endpoint)</th>
+              <td><code class="ltr-code" id="opActiveEndpointText"></code></td>
+            </tr>
+            <tr>
+              <th>متد</th>
+              <td><span class="badge role-badge role-admin">GET</span> یا <span class="badge role-badge role-admin">POST</span> (سایر متدها با کد <code>405</code> رد می‌شوند)</td>
+            </tr>
+            <tr>
+              <th>نوع ورودی</th>
+              <td><code>application/json</code>، <code>form-data</code> یا پارامتر GET</td>
+            </tr>
+            <tr>
+              <th>خروجی</th>
+              <td>همیشه JSON با ساختار ثابت <code class="ltr-code">{ success, message, waybills }</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:document-add-bold"></span> پارامترهای ورودی
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr><th>نام</th><th>نوع</th><th>الزامی</th><th>توضیح</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>token</code></td><td>رشته</td><td>بله</td>
+              <td>توکن استاندارد <code>operator_waybills</code> (از وب‌سرویس ورود یا صفحه
+                <code>operator_waybills_public.php</code>). متصدی از روی همین توکن شناسایی می‌شود.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:document-text-bold"></span> پارامترهای خروجی
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr><th>نام</th><th>نوع</th><th>همیشه؟</th><th>توضیح</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>success</code></td><td>boolean</td><td>بله</td>
+              <td><code>true</code> در پاسخ موفق (حتی وقتی هیچ بارنامه‌ای وجود ندارد)، در خطا <code>false</code></td>
+            </tr>
+            <tr>
+              <td><code>message</code></td><td>رشته</td><td>بله</td>
+              <td>پیام فارسی نتیجه</td>
+            </tr>
+            <tr>
+              <td><code>waybills</code></td><td>آرایه</td><td>بله</td>
+              <td>فهرست بارنامه‌های تخصیص‌یافته به متصدی (مبدا یا مقصد)؛ اگر خالی باشد آرایهٔ تهی است</td>
+            </tr>
+            <tr>
+              <td><code>waybills[].my_role</code></td><td>رشته</td><td>—</td>
+              <td>نقش متصدی در همین بارنامه: <code>origin</code> یا <code>destination</code></td>
+            </tr>
+            <tr>
+              <td><code>waybills[].confirmed_at</code></td><td>رشته (تاریخ‌ساعت) یا <code>null</code></td><td>—</td>
+              <td>زمان تایید حضور متصدی برای همین بارنامه؛ اگر هنوز تایید نشده <code>null</code></td>
+            </tr>
+            <tr>
+              <td><code>waybills[].driver</code></td><td>رشته یا <code>null</code></td><td>—</td>
+              <td>نام کامل راننده؛ اگر تخصیص‌نیافته <code>null</code></td>
+            </tr>
+            <tr>
+              <td><code>waybills[].seal_id</code></td><td>رشته یا <code>null</code></td><td>—</td>
+              <td>شناسه پلمپ تخصیص‌یافته به بارنامه</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:server-square-bold"></span> کدهای وضعیت HTTP
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr><th>کد</th><th>وضعیت</th><th>توضیح</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="badge role-badge role-driver">200</span></td><td>موفق</td><td>پاسخ برگردانده شد؛ اگر بارنامه‌ای نباشد آرایهٔ <code>waybills</code> تهی خواهد بود</td></tr>
+            <tr><td><span class="badge role-badge role-operator">401</span></td><td>عدم احراز</td><td>توکن نامعتبر است یا منقضی شده است</td></tr>
+            <tr><td><span class="badge role-badge role-operator">403</span></td><td>عدم دسترسی</td><td>توکن متعلق به متصدی نیست یا حساب غیرفعال است</td></tr>
+            <tr><td><span class="badge role-badge role-region">405</span></td><td>متد غیرمجاز</td><td>فقط GET یا POST پذیرفته می‌شود</td></tr>
+            <tr><td><span class="badge role-badge role-operator">422</span></td><td>ورودی ناقص</td><td>توکن ارسال نشده است</td></tr>
+            <tr><td><span class="badge role-badge role-admin">500</span></td><td>خطای سرور</td><td>خطای داخلی؛ جزئیات فنی هرگز افشا نمی‌شود</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:check-circle-bold"></span> نمونه پاسخ موفق (200)
+      </h2>
+      <pre data-lang="json" class="api-doc-code ltr-code">{
+  "success": true,
+  "message": "بارنامه‌های ایستگاه با موفقیت دریافت شد.",
+  "waybills": [
+    {
+      "id": 17,
+      "waybill_number": "5",
+      "issue_date": "2026-07-10",
+      "issue_date_jalali": "1405/04/19",
+      "distance_km": 82.5,
+      "product_type": "نفتگاز",
+      "send_status": "ارسال شده",
+      "my_role": "origin",
+      "origin_title": "انبار نفت مرکزی",
+      "destination_title": "پایانه سوخت جنوب",
+      "driver": "علی رضایی",
+      "seal_id": "SL-1042",
+      "confirmed_at": null
+    }
+  ]
+}</pre>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2 mt-4">
+        <span class="iconify text-jade" data-icon="solar:command-bold"></span> نمونه فراخوانی با cURL
+      </h2>
+      <pre data-lang="curl" class="api-doc-code ltr-code" id="opActiveCurlSample"></pre>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2 mt-4">
+        <span class="iconify text-jade" data-icon="logos:javascript"></span> نمونه فراخوانی با JavaScript (fetch)
+      </h2>
+      <pre data-lang="javascript" class="api-doc-code ltr-code" id="opActiveJsSample"></pre>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2 mt-4">
+        <span class="iconify text-jade" data-icon="logos:php"></span> نمونه فراخوانی با PHP (cURL)
+      </h2>
+      <pre data-lang="php" class="api-doc-code ltr-code" id="opActivePhpSample"></pre>
+
+      <div class="alert alert-info d-flex align-items-start gap-2 mt-4 mb-0">
+        <span class="iconify fs-5 mt-1" data-icon="solar:info-circle-bold"></span>
+        <div>
+          <strong>نکات:</strong> معادل <code>api/active_waybill.php</code> راننده است، با این تفاوت که چون
+          متصدی می‌تواند هم‌زمان چند بارنامه (به‌عنوان متصدی مبدا و/یا مقصد) داشته باشد، این وب‌سرویس یک
+          <strong>فهرست</strong> برمی‌گرداند نه یک بارنامهٔ تکی. این وب‌سرویس فقط خواندنی است و هیچ داده‌ای
+          را تغییر نمی‌دهد.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<?php endif; // پایان بخش متصدی (role === 'operator') ?>
 
 <script>
 // آدرس کامل هر وب‌سرویس برای تست و نمونه‌های مستندات
@@ -865,6 +1576,11 @@ window.API_TRIP_ACTION_URL = <?= json_encode((isset($_SERVER['HTTPS']) && $_SERV
 window.API_TEST_TRIP_TOKEN_URL = <?= json_encode(BASE_URL . '/api_test_trip_token.php') ?>;
 window.API_ACTIVE_WAYBILL_URL = <?= json_encode((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . '/api/active_waybill.php') ?>;
 window.API_TEST_DRIVER_TOKEN_URL = <?= json_encode(BASE_URL . '/api_test_driver_token.php') ?>;
+window.API_GEOFENCE_CHECK_URL = <?= json_encode((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . '/map/geofence/check.php') ?>;
+window.API_OPERATOR_ACTION_URL = <?= json_encode((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . '/api/operator_action.php') ?>;
+window.API_TEST_OPERATOR_ACTION_TOKEN_URL = <?= json_encode(BASE_URL . '/api_test_operator_action_token.php') ?>;
+window.API_OPERATOR_WAYBILLS_URL = <?= json_encode((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . '/api/operator_waybills.php') ?>;
+window.API_TEST_OPERATOR_TOKEN_URL = <?= json_encode(BASE_URL . '/api_test_operator_token.php') ?>;
 </script>
 
 <script>

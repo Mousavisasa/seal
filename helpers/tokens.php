@@ -152,3 +152,77 @@ function validate_trip_action_token(string $token): ?array
         'waybill_id' => (int)$parts[2],
     ];
 }
+
+/**
+ * اطمینان از وجود ستون‌های تایید حضور متصدی (origin_confirmed_at / destination_confirmed_at)
+ * روی fuel_waybills؛ اگر روی سرور اضافه نشده باشند، همین‌جا اضافه می‌شوند.
+ */
+function ensure_operator_confirm_columns(): void
+{
+    static $checked = false;
+    if ($checked) {
+        return;
+    }
+    $checked = true;
+
+    try {
+        $cols = db()->query("SHOW COLUMNS FROM fuel_waybills LIKE 'origin_confirmed_at'")->fetch();
+        if (!$cols) {
+            db()->exec("ALTER TABLE fuel_waybills
+                ADD COLUMN origin_confirmed_at TIMESTAMP NULL DEFAULT NULL AFTER trip_ended_at,
+                ADD COLUMN destination_confirmed_at TIMESTAMP NULL DEFAULT NULL AFTER origin_confirmed_at");
+        }
+    } catch (PDOException $e) {
+        error_log('ensure_operator_confirm_columns error: ' . $e->getMessage());
+    }
+}
+
+/**
+ * ساخت توکن یک‌بارمصرف مخصوص «تایید حضور متصدی» در مبدا یا مقصد یک بارنامه مشخص.
+ * دقیقاً مانند create_trip_action_token، نقش (origin/destination) و شناسه بارنامه
+ * داخل خودِ توکن قفل می‌شود.
+ */
+function create_operator_action_token(int $userId, string $role, int $waybillId): string
+{
+    return create_access_token($userId, 'opact:' . $role . ':' . $waybillId);
+}
+
+/**
+ * اعتبارسنجی توکن «تایید حضور متصدی» و استخراج نقش + شناسه بارنامه از آن
+ * @return array|null ['operator'=>..., 'role'=>'origin'|'destination', 'waybill_id'=>int] یا null
+ */
+function validate_operator_action_token(string $token): ?array
+{
+    if ($token === '' || !preg_match('/^[a-f0-9]{64}$/', $token)) {
+        return null;
+    }
+
+    ensure_access_tokens_table();
+
+    $stmt = db()->prepare(
+        "SELECT u.*, t.purpose FROM access_tokens t
+         INNER JOIN users u ON u.id = t.user_id
+         WHERE t.token = ? AND t.purpose LIKE 'opact:%' AND t.expires_at >= NOW()
+         LIMIT 1"
+    );
+    $stmt->execute([$token]);
+    $row = $stmt->fetch();
+
+    if (!$row) {
+        return null;
+    }
+
+    $parts = explode(':', $row['purpose'], 3);
+    if (count($parts) !== 3 || !in_array($parts[1], ['origin', 'destination'], true) || !ctype_digit($parts[2])) {
+        return null;
+    }
+
+    $operator = $row;
+    unset($operator['password'], $operator['purpose']);
+
+    return [
+        'operator'   => $operator,
+        'role'       => $parts[1],
+        'waybill_id' => (int)$parts[2],
+    ];
+}

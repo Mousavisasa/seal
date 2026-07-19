@@ -534,6 +534,261 @@
   }
 })();
 
+/* ---------- صفحه مستندات وب‌سرویس حصار جغرافیایی (متصدی) ---------- */
+(function () {
+  'use strict';
+  var geofenceApiUrl = window.API_GEOFENCE_CHECK_URL;
+
+  var geofenceEndpointText = document.getElementById('geofenceEndpointText');
+  if (geofenceEndpointText && geofenceApiUrl) geofenceEndpointText.textContent = 'GET ' + geofenceApiUrl + '?id=...&lat=...&lon=...';
+
+  var geofenceCurlSample = document.getElementById('geofenceCurlSample');
+  if (geofenceCurlSample && geofenceApiUrl) geofenceCurlSample.textContent =
+    'curl -X GET "' + geofenceApiUrl + '?id=<LOCATION_ID>&lat=<LAT>&lon=<LON>"';
+})();
+
+/* ---------- صفحه تست وب‌سرویس تایید حضور متصدی ---------- */
+(function () {
+  'use strict';
+  var opTripSendBtn = document.getElementById('opTripSendBtn');
+  var opTripApiUrl = window.API_OPERATOR_ACTION_URL;
+  var mintTokenUrl = window.API_TEST_OPERATOR_ACTION_TOKEN_URL;
+
+  var opTripEndpointText = document.getElementById('opTripEndpointText');
+  if (opTripEndpointText && opTripApiUrl) opTripEndpointText.textContent = 'POST ' + opTripApiUrl;
+
+  var opTripCurlSample = document.getElementById('opTripCurlSample');
+  if (opTripCurlSample && opTripApiUrl) opTripCurlSample.textContent =
+    'curl -X POST "' + opTripApiUrl + '" \\\n' +
+    '  -H "Content-Type: application/x-www-form-urlencoded" \\\n' +
+    '  --data-urlencode "token=<TOKEN>"';
+
+  var opTripJsSample = document.getElementById('opTripJsSample');
+  if (opTripJsSample && opTripApiUrl) opTripJsSample.textContent =
+    'const res = await fetch("' + opTripApiUrl + '", {\n' +
+    '  method: "POST",\n' +
+    '  headers: { "Content-Type": "application/x-www-form-urlencoded" },\n' +
+    '  body: "token=" + encodeURIComponent(token)\n' +
+    '});\n' +
+    'const data = await res.json();\n' +
+    'if (data.success) {\n' +
+    '  console.log("ثبت شد:", data.message);\n' +
+    '} else {\n' +
+    '  console.log("خطا:", data.message);\n' +
+    '}';
+
+  var opTripPhpSample = document.getElementById('opTripPhpSample');
+  if (opTripPhpSample && opTripApiUrl) opTripPhpSample.textContent =
+    '$ch = curl_init("' + opTripApiUrl + '");\n' +
+    'curl_setopt($ch, CURLOPT_POST, true);\n' +
+    'curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);\n' +
+    'curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([\n' +
+    '    "token" => $token,\n' +
+    ']));\n' +
+    '$response = curl_exec($ch);\n' +
+    '$status   = curl_getinfo($ch, CURLINFO_HTTP_CODE);\n' +
+    'curl_close($ch);\n' +
+    '$data = json_decode($response, true);';
+
+  if (!opTripSendBtn) return;
+
+  var opWaybillSelect = document.getElementById('opTripWaybillSelect');
+  var opTripClearBtn  = document.getElementById('opTripClearBtn');
+  var opTripResultBox = document.getElementById('opTripResultBox');
+  var opTripTokenText = document.getElementById('opTripTokenText');
+  var opTripStatusBadge = document.getElementById('opTripStatusBadge');
+  var opTripTimeBadge = document.getElementById('opTripTimeBadge');
+  var opTripResponseEl = document.getElementById('opTripResponse');
+
+  function showOpTripResult(status, body, ms, isNetworkError) {
+    if (!opTripResultBox || !opTripStatusBadge || !opTripTimeBadge || !opTripResponseEl) return;
+    opTripResultBox.classList.remove('d-none');
+    opTripStatusBadge.className = 'badge rounded-pill ' +
+      (isNetworkError ? 'badge-status-err'
+        : status >= 200 && status < 300 ? 'badge-status-ok'
+        : status >= 400 && status < 500 ? 'badge-status-warn'
+        : 'badge-status-err');
+    opTripStatusBadge.textContent = isNetworkError ? 'خطای اتصال' : ('HTTP ' + status);
+    opTripTimeBadge.textContent = 'زمان پاسخ: ' + ms + ' میلی‌ثانیه';
+    opTripResponseEl.textContent = body;
+  }
+
+  opTripSendBtn.addEventListener('click', function () {
+    var opt = opWaybillSelect.options[opWaybillSelect.selectedIndex];
+    if (!opt) return;
+    var waybillId = opt.value;
+    var role = opt.getAttribute('data-role');
+
+    opTripSendBtn.disabled = true;
+    if (opTripTokenText) opTripTokenText.textContent = 'در حال ساخت توکن…';
+    var start = (window.performance && performance.now) ? performance.now() : Date.now();
+
+    fetch(mintTokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'waybill_id=' + encodeURIComponent(waybillId) + '&role=' + encodeURIComponent(role)
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (mintData) {
+        if (!mintData.success) {
+          if (opTripTokenText) opTripTokenText.textContent = '—';
+          var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+          showOpTripResult(0, 'خطا در ساخت توکن آزمایشی: ' + mintData.message, elapsed, true);
+          opTripSendBtn.disabled = false;
+          return;
+        }
+
+        if (opTripTokenText) opTripTokenText.textContent = mintData.token;
+
+        fetch(opTripApiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'token=' + encodeURIComponent(mintData.token)
+        })
+          .then(function (res) {
+            return res.text().then(function (text) {
+              var pretty = text;
+              try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch (e) {}
+              var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+              showOpTripResult(res.status, pretty, elapsed, false);
+              opTripSendBtn.disabled = false;
+            });
+          })
+          .catch(function (err) {
+            var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+            showOpTripResult(0, 'اتصال به سرور برقرار نشد.\n\n' + (err && err.message ? err.message : ''), elapsed, true);
+            opTripSendBtn.disabled = false;
+          });
+      })
+      .catch(function (err) {
+        var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+        showOpTripResult(0, 'اتصال به سرور برقرار نشد.\n\n' + (err && err.message ? err.message : ''), elapsed, true);
+        opTripSendBtn.disabled = false;
+      });
+  });
+
+  if (opTripClearBtn) {
+    opTripClearBtn.addEventListener('click', function () {
+      if (opTripResultBox) opTripResultBox.classList.add('d-none');
+      if (opTripResponseEl) opTripResponseEl.textContent = '';
+      if (opTripTokenText) opTripTokenText.textContent = '';
+    });
+  }
+})();
+
+/* ---------- صفحه تست وب‌سرویس بارنامه‌های ایستگاه متصدی ---------- */
+(function () {
+  'use strict';
+  var opActiveSendBtn = document.getElementById('opActiveSendBtn');
+  var opActiveApiUrl = window.API_OPERATOR_WAYBILLS_URL;
+  var mintOperatorTokenUrl = window.API_TEST_OPERATOR_TOKEN_URL;
+
+  var opActiveEndpointText = document.getElementById('opActiveEndpointText');
+  if (opActiveEndpointText && opActiveApiUrl) opActiveEndpointText.textContent = 'GET ' + opActiveApiUrl + '?token=...';
+
+  var opActiveCurlSample = document.getElementById('opActiveCurlSample');
+  if (opActiveCurlSample && opActiveApiUrl) opActiveCurlSample.textContent =
+    'curl -X GET "' + opActiveApiUrl + '?token=<TOKEN>"';
+
+  var opActiveJsSample = document.getElementById('opActiveJsSample');
+  if (opActiveJsSample && opActiveApiUrl) opActiveJsSample.textContent =
+    'const res = await fetch("' + opActiveApiUrl + '?token=" + encodeURIComponent(token));\n' +
+    'const data = await res.json();\n' +
+    'if (data.success) {\n' +
+    '  console.log("بارنامه‌های ایستگاه:", data.waybills);\n' +
+    '} else {\n' +
+    '  console.log("خطا:", data.message);\n' +
+    '}';
+
+  var opActivePhpSample = document.getElementById('opActivePhpSample');
+  if (opActivePhpSample && opActiveApiUrl) opActivePhpSample.textContent =
+    '$ch = curl_init("' + opActiveApiUrl + '?token=" . urlencode($token));\n' +
+    'curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);\n' +
+    '$response = curl_exec($ch);\n' +
+    '$status   = curl_getinfo($ch, CURLINFO_HTTP_CODE);\n' +
+    'curl_close($ch);\n' +
+    '$data = json_decode($response, true);';
+
+  if (!opActiveSendBtn) return;
+
+  var operatorSelect = document.getElementById('opActiveOperatorSelect');
+  var opActiveClearBtn = document.getElementById('opActiveClearBtn');
+  var opActiveResultBox = document.getElementById('opActiveResultBox');
+  var opActiveTokenText = document.getElementById('opActiveTokenText');
+  var opActiveStatusBadge = document.getElementById('opActiveStatusBadge');
+  var opActiveTimeBadge = document.getElementById('opActiveTimeBadge');
+  var opActiveResponseEl = document.getElementById('opActiveResponse');
+
+  function showOpActiveResult(status, body, ms, isNetworkError) {
+    if (!opActiveResultBox || !opActiveStatusBadge || !opActiveTimeBadge || !opActiveResponseEl) return;
+    opActiveResultBox.classList.remove('d-none');
+    opActiveStatusBadge.className = 'badge rounded-pill ' +
+      (isNetworkError ? 'badge-status-err'
+        : status >= 200 && status < 300 ? 'badge-status-ok'
+        : status >= 400 && status < 500 ? 'badge-status-warn'
+        : 'badge-status-err');
+    opActiveStatusBadge.textContent = isNetworkError ? 'خطای اتصال' : ('HTTP ' + status);
+    opActiveTimeBadge.textContent = 'زمان پاسخ: ' + ms + ' میلی‌ثانیه';
+    opActiveResponseEl.textContent = body;
+  }
+
+  opActiveSendBtn.addEventListener('click', function () {
+    var operatorId = operatorSelect.value;
+    if (!operatorId) return;
+
+    opActiveSendBtn.disabled = true;
+    if (opActiveTokenText) opActiveTokenText.textContent = 'در حال ساخت توکن…';
+    var start = (window.performance && performance.now) ? performance.now() : Date.now();
+
+    fetch(mintOperatorTokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'operator_id=' + encodeURIComponent(operatorId)
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (mintData) {
+        if (!mintData.success) {
+          if (opActiveTokenText) opActiveTokenText.textContent = '—';
+          var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+          showOpActiveResult(0, 'خطا در ساخت توکن آزمایشی: ' + mintData.message, elapsed, true);
+          opActiveSendBtn.disabled = false;
+          return;
+        }
+
+        if (opActiveTokenText) opActiveTokenText.textContent = mintData.token;
+
+        fetch(opActiveApiUrl + '?token=' + encodeURIComponent(mintData.token))
+          .then(function (res) {
+            return res.text().then(function (text) {
+              var pretty = text;
+              try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch (e) {}
+              var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+              showOpActiveResult(res.status, pretty, elapsed, false);
+              opActiveSendBtn.disabled = false;
+            });
+          })
+          .catch(function (err) {
+            var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+            showOpActiveResult(0, 'اتصال به سرور برقرار نشد.\n\n' + (err && err.message ? err.message : ''), elapsed, true);
+            opActiveSendBtn.disabled = false;
+          });
+      })
+      .catch(function (err) {
+        var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+        showOpActiveResult(0, 'اتصال به سرور برقرار نشد.\n\n' + (err && err.message ? err.message : ''), elapsed, true);
+        opActiveSendBtn.disabled = false;
+      });
+  });
+
+  if (opActiveClearBtn) {
+    opActiveClearBtn.addEventListener('click', function () {
+      if (opActiveResultBox) opActiveResultBox.classList.add('d-none');
+      if (opActiveResponseEl) opActiveResponseEl.textContent = '';
+      if (opActiveTokenText) opActiveTokenText.textContent = '';
+    });
+  }
+})();
+
 /* ---------- تقویم شمسی برای فیلدهای تاریخ ---------- */
 (function () {
   'use strict';
