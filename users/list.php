@@ -37,10 +37,19 @@ require __DIR__ . '/../includes/header.php';
 
 <?= render_flash() ?>
 
+<?php if ($users): ?>
+<div class="filter-bar mb-3">
+  <div class="input-group" style="max-width: 340px;">
+    <span class="input-group-text"><span class="iconify" data-icon="solar:magnifer-bold"></span></span>
+    <input type="text" class="form-control" id="usersSearch" placeholder="جستجو در نام، کد ملی، نقش و...">
+  </div>
+</div>
+<?php endif; ?>
+
 <div class="card panel-card">
   <div class="card-body p-0">
     <?php if ($users): ?>
-    <div id="gridUsers" class="seal-ag-grid ag-theme-quartz"></div>
+    <div id="gridUsers" class="seal-ag-grid"></div>
     <?php else: ?>
       <div class="text-center text-muted p-5">
         <span class="iconify fs-1 d-block mb-2" data-icon="solar:users-group-rounded-line-duotone"></span>
@@ -53,7 +62,19 @@ require __DIR__ . '/../includes/header.php';
 <?php if ($users): ?>
 <script>
 (function () {
+  var csrfField = <?= json_encode(csrf_field(), JSON_UNESCAPED_UNICODE) ?>;
+  var currentUserId = <?= (int)$_SESSION['user_id'] ?>;
   var rows = <?= json_encode(array_map(function ($u) {
+      $actions = '<div class="d-flex gap-1 flex-wrap">'
+          . '<a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/users/edit.php?id=' . (int)$u['id'] . '"><span class="iconify" data-icon="solar:pen-bold"></span> ویرایش</a>'
+          . '<a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/users/reset_password.php?id=' . (int)$u['id'] . '"><span class="iconify" data-icon="solar:key-bold"></span> بازنشانی رمز</a>';
+      if ((int)$u['id'] !== (int)$_SESSION['user_id']) {
+          $actions .= '<form method="post" action="' . BASE_URL . '/users/delete.php" class="d-inline" data-delete-form data-confirm="آیا از حذف کاربر «' . e($u['first_name'] . ' ' . $u['last_name']) . '» مطمئن هستید؟">'
+              . '<input type="hidden" name="id" value="' . (int)$u['id'] . '">'
+              . '<button type="submit" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"><span class="iconify" data-icon="solar:trash-bin-trash-bold"></span> حذف</button>'
+              . '</form>';
+      }
+      $actions .= '</div>';
       return [
           'id' => (int)$u['id'],
           'name' => $u['first_name'] . ' ' . $u['last_name'],
@@ -64,10 +85,7 @@ require __DIR__ . '/../includes/header.php';
               ? '<span class="status-badge status-delivered">فعال</span>'
               : '<span class="status-badge status-cancelled">غیرفعال</span>',
           'created_at' => to_jalali_datetime_display($u['created_at']),
-          'actions' => '<div class="d-flex gap-1 flex-wrap">'
-              . '<a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/users/edit.php?id=' . (int)$u['id'] . '"><span class="iconify" data-icon="solar:pen-bold"></span> ویرایش</a>'
-              . '<a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/users/reset_password.php?id=' . (int)$u['id'] . '"><span class="iconify" data-icon="solar:key-bold"></span> بازنشانی رمز</a>'
-              . '</div>',
+          'actions' => $actions,
       ];
   }, $users), JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT) ?>;
   var columnDefs = [
@@ -77,12 +95,12 @@ require __DIR__ . '/../includes/header.php';
     { field: 'role', headerName: 'نقش', flex: 1, html: true },
     { field: 'region', headerName: 'منطقه', flex: 1, html: true },
     { field: 'status', headerName: 'وضعیت', flex: 1, html: true },
-    { field: 'created_at', headerName: 'تاریخ ثبت', flex: 1, cellClass: 'ltr-text text-muted small' },
-    { field: 'actions', headerName: 'عملیات', flex: 2, html: true, sortable: false }
+    { field: 'created_at', headerName: 'تاریخ ثبت', flex: 1, cellClass: 'ltr-text text-muted small', filter: false },
+    { field: 'actions', headerName: 'عملیات', flex: 2, html: true, sortable: false, filter: false }
   ];
   function boot() {
     if (typeof sealInitDataGrid === 'undefined') { setTimeout(boot, 30); return; }
-    sealInitDataGrid('gridUsers', columnDefs, rows);
+    sealInitDataGrid('gridUsers', columnDefs, rows, { searchInputId: 'usersSearch' });
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);

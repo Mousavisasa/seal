@@ -53,10 +53,19 @@ require __DIR__ . '/../includes/header.php';
 
 <?= render_flash() ?>
 
+<?php if ($waybills): ?>
+<div class="filter-bar mb-3">
+  <div class="input-group" style="max-width: 340px;">
+    <span class="input-group-text"><span class="iconify" data-icon="solar:magnifer-bold"></span></span>
+    <input type="text" class="form-control" id="myWaybillsSearch" placeholder="جستجوی سراسری">
+  </div>
+</div>
+<?php endif; ?>
+
 <div class="card panel-card">
   <div class="card-body p-0">
     <?php if ($waybills): ?>
-    <div id="gridMyWaybills" class="seal-ag-grid ag-theme-quartz"></div>
+    <div id="gridMyWaybills" class="seal-ag-grid"></div>
     <?php else: ?>
       <div class="text-center text-muted p-5">
         <span class="iconify fs-1 d-block mb-2" data-icon="solar:fuel-line-duotone"></span>
@@ -101,11 +110,11 @@ require __DIR__ . '/../includes/header.php';
     { field: 'issue_date', headerName: 'تاریخ صدور', flex: 1, cellClass: 'ltr-text text-muted small' },
     { field: 'status', headerName: 'وضعیت', flex: 1, html: true },
     { field: 'driver', headerName: 'راننده', flex: 1, html: true },
-    { field: 'actions', headerName: 'عملیات', flex: 1, html: true, sortable: false }
+    { field: 'actions', headerName: 'عملیات', flex: 1, html: true, sortable: false, filter: false }
   ];
   function boot() {
     if (typeof sealInitDataGrid === 'undefined') { setTimeout(boot, 30); return; }
-    sealInitDataGrid('gridMyWaybills', columnDefs, rows);
+    sealInitDataGrid('gridMyWaybills', columnDefs, rows, { searchInputId: 'myWaybillsSearch' });
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);

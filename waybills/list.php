@@ -11,9 +11,6 @@ require_waybill_access();
 
 $myRegionId = session_region_id();
 
-$search = trim((string)($_GET['q'] ?? ''));
-$statusFilter = trim((string)($_GET['status'] ?? ''));
-$productFilter = trim((string)($_GET['product'] ?? ''));
 $waybills = [];
 
 try {
@@ -41,19 +38,6 @@ try {
         $sql .= ' AND (ol.region_id = ? OR dl.region_id = ?)';
         $params[] = $myRegionId;
         $params[] = $myRegionId;
-    }
-
-    if ($search !== '') {
-        $sql .= ' AND w.waybill_number LIKE ?';
-        $params[] = '%' . $search . '%';
-    }
-    if ($statusFilter !== '' && in_array($statusFilter, SEND_STATUSES, true)) {
-        $sql .= ' AND w.send_status = ?';
-        $params[] = $statusFilter;
-    }
-    if ($productFilter !== '' && in_array($productFilter, PRODUCT_TYPES, true)) {
-        $sql .= ' AND w.product_type = ?';
-        $params[] = $productFilter;
     }
     $sql .= ' ORDER BY w.id DESC';
 
@@ -89,46 +73,20 @@ require __DIR__ . '/../includes/header.php';
 
 <?= render_flash() ?>
 
-<div class="filter-bar mb-4">
-  <form method="get" action="<?= BASE_URL ?>/waybills/list.php" class="row g-2 align-items-end">
-    <div class="col-md-4">
-      <label class="form-label" for="q">جستجو در شماره بارنامه</label>
-      <div class="input-group">
-        <span class="input-group-text"><span class="iconify" data-icon="solar:magnifer-bold"></span></span>
-        <input type="text" class="form-control ltr-text" id="q" name="q" value="<?= e($search) ?>" placeholder="مثلاً WB-1001">
-      </div>
-    </div>
-    <div class="col-md-3">
-      <label class="form-label" for="status">وضعیت ارسال</label>
-      <select class="form-select" id="status" name="status">
-        <option value="">همه وضعیت‌ها</option>
-        <?php foreach (SEND_STATUSES as $s): ?>
-          <option value="<?= e($s) ?>" <?= $statusFilter === $s ? 'selected' : '' ?>><?= e($s) ?></option>
-        <?php endforeach; ?>
-      </select>
-    </div>
-    <div class="col-md-3">
-      <label class="form-label" for="product">نوع فرآورده</label>
-      <select class="form-select" id="product" name="product">
-        <option value="">همه فرآورده‌ها</option>
-        <?php foreach (PRODUCT_TYPES as $p): ?>
-          <option value="<?= e($p) ?>" <?= $productFilter === $p ? 'selected' : '' ?>><?= e($p) ?></option>
-        <?php endforeach; ?>
-      </select>
-    </div>
-    <div class="col-md-2 d-flex gap-2">
-      <button type="submit" class="btn btn-soft-purple d-flex align-items-center gap-2">
-        <span class="iconify" data-icon="solar:magnifer-bold"></span> اعمال
-      </button>
-      <a href="<?= BASE_URL ?>/waybills/list.php" class="btn btn-outline-secondary">پاک‌کردن</a>
-    </div>
-  </form>
+<?php if ($waybills): ?>
+<div class="filter-bar mb-3">
+  <div class="input-group" style="max-width: 340px;">
+    <span class="input-group-text"><span class="iconify" data-icon="solar:magnifer-bold"></span></span>
+    <input type="text" class="form-control" id="waybillsSearch" placeholder="جستجوی سراسری (شماره، مبدا، مقصد، وضعیت و...)">
+  </div>
+  <p class="text-muted small mb-0 mt-2">برای فیلتر دقیق‌تر روی هر ستون، از فیلترهای زیر عنوان ستون‌ها استفاده کنید.</p>
 </div>
+<?php endif; ?>
 
 <div class="card panel-card">
   <div class="card-body p-0">
     <?php if ($waybills): ?>
-    <div id="gridWaybills" class="seal-ag-grid ag-theme-quartz"></div>
+    <div id="gridWaybills" class="seal-ag-grid"></div>
     <?php else: ?>
       <div class="text-center text-muted p-5">
         <span class="iconify fs-1 d-block mb-2" data-icon="solar:fuel-line-duotone"></span>
@@ -166,13 +124,13 @@ require __DIR__ . '/../includes/header.php';
           'driver' => $w['driver_first'] ? e($w['driver_first'] . ' ' . $w['driver_last']) : '<span class="text-muted">—</span>',
           'actions' => '<div class="d-flex gap-1 flex-wrap">'
               . '<a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/waybills/edit.php?id=' . (int)$w['id'] . '"><span class="iconify" data-icon="solar:pen-bold"></span> ویرایش</a>'
-              . '<form method="post" action="' . BASE_URL . '/waybills/delete.php" onsubmit="return confirm(\'آیا از حذف بارنامه «' . e($w['waybill_number']) . '» مطمئن هستید؟\');">'
+              . '<form method="post" action="' . BASE_URL . '/waybills/delete.php" class="d-inline" data-delete-form data-confirm="' . e('آیا از حذف بارنامه «' . $w['waybill_number'] . '» مطمئن هستید؟') . '">'
               . csrf_field()
               . '<input type="hidden" name="id" value="' . (int)$w['id'] . '">'
               . '<button type="submit" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"><span class="iconify" data-icon="solar:trash-bin-trash-bold"></span> حذف</button>'
               . '</form></div>',
       ];
-  }, $waybills), JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT | JSON_HEX_APOS) ?>;
+  }, $waybills), JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT) ?>;
   var columnDefs = [
     { field: 'waybill_number', headerName: 'شماره بارنامه', flex: 1, html: true, cellClass: 'ltr-text fw-bold' },
     { field: 'origin', headerName: 'مبدا', flex: 1.5, html: true },
@@ -183,13 +141,13 @@ require __DIR__ . '/../includes/header.php';
     { field: 'status', headerName: 'وضعیت', flex: 1, html: true },
     { field: 'seal', headerName: 'پلمپ', flex: 1, html: true, cellClass: 'ltr-text' },
     { field: 'origin_operator', headerName: 'متصدی مبدا', flex: 1, html: true },
-    { field: 'dest_operator', headerName: 'متصدی مقصد', flex: 1.5, html: true },
+    { field: 'dest_operator', headerName: 'متصدی مقصد', flex: 1.5, html: true, filter: false },
     { field: 'driver', headerName: 'راننده', flex: 1, html: true },
-    { field: 'actions', headerName: 'عملیات', flex: 2, html: true, sortable: false }
+    { field: 'actions', headerName: 'عملیات', flex: 2, html: true, sortable: false, filter: false }
   ];
   function boot() {
     if (typeof sealInitDataGrid === 'undefined') { setTimeout(boot, 30); return; }
-    sealInitDataGrid('gridWaybills', columnDefs, rows);
+    sealInitDataGrid('gridWaybills', columnDefs, rows, { searchInputId: 'waybillsSearch' });
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);

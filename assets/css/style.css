@@ -455,20 +455,8 @@ body { background: var(--surface); color: var(--ink); }
 .chart-data-table td { border-color: #f3f5f4; padding: .4rem .5rem; }
 .table-total-row td { border-top: 2px solid #eef1f0; background: #fafcfb; }
 
-/* ---------- AG Grid (جدول‌های فهرست) ---------- */
-.seal-ag-grid {
-  --ag-font-family: 'Vazirmatn', Tahoma, sans-serif;
-  --ag-font-size: 13.5px;
-  --ag-border-color: #eef1f0;
-  --ag-row-border-color: #f3f5f4;
-  --ag-header-background-color: transparent;
-  --ag-header-foreground-color: var(--dim);
-  --ag-header-column-resize-handle-display: none;
-  --ag-row-hover-color: var(--jade-soft);
-  --ag-odd-row-background-color: var(--surface);
-  --ag-wrapper-border-radius: 0 0 var(--card-radius) var(--card-radius);
-  --ag-cell-horizontal-padding: 1rem;
-}
+/* ---------- AG Grid (جدول‌های فهرست) — تم اختصاصی از assets/js/ag-grid-theme.js اعمال می‌شود ---------- */
+.seal-ag-grid { width: 100%; }
 .seal-ag-grid .ag-cell { display: flex; align-items: center; }
 .seal-ag-grid .ag-cell .badge,
 .seal-ag-grid .ag-cell .status-badge,

@@ -8,19 +8,10 @@ require_once __DIR__ . '/../helpers/auth.php';
 
 require_waybill_access();
 
-$search = trim((string)($_GET['q'] ?? ''));
 $regions = [];
 
 try {
-    if ($search !== '') {
-        $stmt = db()->prepare(
-            'SELECT * FROM regions WHERE region_name LIKE ? OR region_code LIKE ? ORDER BY region_code ASC'
-        );
-        $like = '%' . $search . '%';
-        $stmt->execute([$like, $like]);
-    } else {
-        $stmt = db()->query('SELECT * FROM regions ORDER BY region_code ASC');
-    }
+    $stmt = db()->query('SELECT * FROM regions ORDER BY region_code ASC');
     $regions = $stmt->fetchAll();
 } catch (PDOException $e) {
     error_log('Regions list error: ' . $e->getMessage());
@@ -44,28 +35,19 @@ require __DIR__ . '/../includes/header.php';
 
 <?= render_flash() ?>
 
-<div class="filter-bar mb-4">
-  <form method="get" action="<?= BASE_URL ?>/regions/list.php" class="row g-2 align-items-end">
-    <div class="col-md-8">
-      <label class="form-label" for="q">جستجو در کد یا نام منطقه</label>
-      <div class="input-group">
-        <span class="input-group-text"><span class="iconify" data-icon="solar:magnifer-bold"></span></span>
-        <input type="text" class="form-control" id="q" name="q" value="<?= e($search) ?>" placeholder="مثلاً تهران یا 1">
-      </div>
-    </div>
-    <div class="col-md-4 d-flex gap-2">
-      <button type="submit" class="btn btn-soft-purple d-flex align-items-center gap-2">
-        <span class="iconify" data-icon="solar:magnifer-bold"></span> جستجو
-      </button>
-      <a href="<?= BASE_URL ?>/regions/list.php" class="btn btn-outline-secondary">پاک‌کردن</a>
-    </div>
-  </form>
+<?php if ($regions): ?>
+<div class="filter-bar mb-3">
+  <div class="input-group" style="max-width: 340px;">
+    <span class="input-group-text"><span class="iconify" data-icon="solar:magnifer-bold"></span></span>
+    <input type="text" class="form-control" id="regionsSearch" placeholder="جستجو در کد یا نام منطقه">
+  </div>
 </div>
+<?php endif; ?>
 
 <div class="card panel-card">
   <div class="card-body p-0">
     <?php if ($regions): ?>
-    <div id="gridRegions" class="seal-ag-grid ag-theme-quartz"></div>
+    <div id="gridRegions" class="seal-ag-grid"></div>
     <?php else: ?>
       <div class="text-center text-muted p-5">
         <span class="iconify fs-1 d-block mb-2" data-icon="solar:map-point-line-duotone"></span>
@@ -82,17 +64,23 @@ require __DIR__ . '/../includes/header.php';
       return [
           'region_code' => e((string)$r['region_code']),
           'region_name' => e($r['region_name']),
-          'actions' => '<a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/regions/edit.php?code=' . (int)$r['region_code'] . '"><span class="iconify" data-icon="solar:pen-bold"></span> ویرایش</a>',
+          'actions' => '<div class="d-flex gap-1 flex-wrap">'
+              . '<a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/regions/edit.php?code=' . (int)$r['region_code'] . '"><span class="iconify" data-icon="solar:pen-bold"></span> ویرایش</a>'
+              . '<form method="post" action="' . BASE_URL . '/regions/delete.php" class="d-inline" data-delete-form data-confirm="' . e('آیا از حذف منطقه «' . $r['region_name'] . '» مطمئن هستید؟') . '">'
+              . csrf_field()
+              . '<input type="hidden" name="region_code" value="' . (int)$r['region_code'] . '">'
+              . '<button type="submit" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"><span class="iconify" data-icon="solar:trash-bin-trash-bold"></span> حذف</button>'
+              . '</form></div>',
       ];
   }, $regions), JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT) ?>;
   var columnDefs = [
     { field: 'region_code', headerName: 'کد منطقه', flex: 1, html: true, cellClass: 'ltr-text fw-bold' },
     { field: 'region_name', headerName: 'نام منطقه', flex: 2, html: true },
-    { field: 'actions', headerName: 'عملیات', flex: 1, html: true, sortable: false }
+    { field: 'actions', headerName: 'عملیات', flex: 1.5, html: true, sortable: false, filter: false }
   ];
   function boot() {
     if (typeof sealInitDataGrid === 'undefined') { setTimeout(boot, 30); return; }
-    sealInitDataGrid('gridRegions', columnDefs, rows);
+    sealInitDataGrid('gridRegions', columnDefs, rows, { searchInputId: 'regionsSearch' });
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);

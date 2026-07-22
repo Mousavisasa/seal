@@ -1,6 +1,6 @@
 <?php
 /**
- * فهرست مبادی/مقاصد با جستجو و فیلتر منطقه
+ * فهرست مبادی/مقاصد با جستجو و فیلتر داخل AG Grid
  * locations.region_id به regions.region_code ارجاع دارد
  */
 require_once __DIR__ . '/../config/db.php';
@@ -8,34 +8,15 @@ require_once __DIR__ . '/../helpers/auth.php';
 
 require_waybill_access();
 
-$search = trim((string)($_GET['q'] ?? ''));
-$regionFilter = (int)($_GET['region_id'] ?? 0);
 $locations = [];
-$regions = [];
 
 try {
-    $regions = db()->query('SELECT region_code, region_name FROM regions ORDER BY region_name')->fetchAll();
-
-    $sql = 'SELECT l.*, r.region_name
-            FROM locations l
-            INNER JOIN regions r ON r.region_code = l.region_id
-            WHERE 1=1';
-    $params = [];
-
-    if ($search !== '') {
-        $sql .= ' AND (l.title LIKE ? OR l.location_code LIKE ?)';
-        $like = '%' . $search . '%';
-        $params[] = $like;
-        $params[] = $like;
-    }
-    if ($regionFilter > 0) {
-        $sql .= ' AND l.region_id = ?';
-        $params[] = $regionFilter;
-    }
-    $sql .= ' ORDER BY l.id DESC';
-
-    $stmt = db()->prepare($sql);
-    $stmt->execute($params);
+    $stmt = db()->query(
+        'SELECT l.*, r.region_name
+         FROM locations l
+         INNER JOIN regions r ON r.region_code = l.region_id
+         ORDER BY l.id DESC'
+    );
     $locations = $stmt->fetchAll();
 } catch (PDOException $e) {
     error_log('Locations list error: ' . $e->getMessage());
@@ -59,39 +40,19 @@ require __DIR__ . '/../includes/header.php';
 
 <?= render_flash() ?>
 
-<div class="filter-bar mb-4">
-  <form method="get" action="<?= BASE_URL ?>/locations/list.php" class="row g-2 align-items-end">
-    <div class="col-md-5">
-      <label class="form-label" for="q">جستجو در کد یا عنوان مکان</label>
-      <div class="input-group">
-        <span class="input-group-text"><span class="iconify" data-icon="solar:magnifer-bold"></span></span>
-        <input type="text" class="form-control" id="q" name="q" value="<?= e($search) ?>" placeholder="مثلاً انبار نفت یا LOC-001">
-      </div>
-    </div>
-    <div class="col-md-4">
-      <label class="form-label" for="region_id">فیلتر بر اساس منطقه</label>
-      <select class="form-select" id="region_id" name="region_id">
-        <option value="0">همه مناطق</option>
-        <?php foreach ($regions as $r): ?>
-          <option value="<?= e((string)$r['region_code']) ?>" <?= $regionFilter === (int)$r['region_code'] ? 'selected' : '' ?>>
-            <?= e($r['region_name']) ?> (<?= e((string)$r['region_code']) ?>)
-          </option>
-        <?php endforeach; ?>
-      </select>
-    </div>
-    <div class="col-md-3 d-flex gap-2">
-      <button type="submit" class="btn btn-soft-purple d-flex align-items-center gap-2">
-        <span class="iconify" data-icon="solar:magnifer-bold"></span> جستجو
-      </button>
-      <a href="<?= BASE_URL ?>/locations/list.php" class="btn btn-outline-secondary">پاک‌کردن</a>
-    </div>
-  </form>
+<?php if ($locations): ?>
+<div class="filter-bar mb-3">
+  <div class="input-group" style="max-width: 340px;">
+    <span class="input-group-text"><span class="iconify" data-icon="solar:magnifer-bold"></span></span>
+    <input type="text" class="form-control" id="locationsSearch" placeholder="جستجوی سراسری (کد، عنوان، منطقه و...)">
+  </div>
 </div>
+<?php endif; ?>
 
 <div class="card panel-card">
   <div class="card-body p-0">
     <?php if ($locations): ?>
-    <div id="gridLocations" class="seal-ag-grid ag-theme-quartz"></div>
+    <div id="gridLocations" class="seal-ag-grid"></div>
     <?php else: ?>
       <div class="text-center text-muted p-5">
         <span class="iconify fs-1 d-block mb-2" data-icon="solar:signpost-line-duotone"></span>
@@ -115,6 +76,11 @@ require __DIR__ . '/../includes/header.php';
           'actions' => '<div class="d-flex gap-2 justify-content-end">'
               . '<a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/map/index.php?location_id=' . (int)$l['id'] . '"><span class="iconify" data-icon="solar:map-point-bold"></span> نقشه</a>'
               . '<a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/locations/edit.php?id=' . (int)$l['id'] . '"><span class="iconify" data-icon="solar:pen-bold"></span> ویرایش</a>'
+              . '<form method="post" action="' . BASE_URL . '/locations/delete.php" class="d-inline" data-delete-form data-confirm="' . e('آیا از حذف مکان «' . $l['title'] . '» مطمئن هستید؟') . '">'
+              . csrf_field()
+              . '<input type="hidden" name="id" value="' . (int)$l['id'] . '">'
+              . '<button type="submit" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"><span class="iconify" data-icon="solar:trash-bin-trash-bold"></span> حذف</button>'
+              . '</form>'
               . '</div>',
       ];
   }, $locations), JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT) ?>;
@@ -124,11 +90,11 @@ require __DIR__ . '/../includes/header.php';
     { field: 'title', headerName: 'عنوان', flex: 1.5, html: true },
     { field: 'region', headerName: 'منطقه', flex: 1, html: true },
     { field: 'coords', headerName: 'مختصات جغرافیایی', flex: 1, html: true, cellClass: 'ltr-text text-muted small' },
-    { field: 'actions', headerName: 'عملیات', flex: 1.5, html: true, sortable: false }
+    { field: 'actions', headerName: 'عملیات', flex: 2, html: true, sortable: false, filter: false }
   ];
   function boot() {
     if (typeof sealInitDataGrid === 'undefined') { setTimeout(boot, 30); return; }
-    sealInitDataGrid('gridLocations', columnDefs, rows);
+    sealInitDataGrid('gridLocations', columnDefs, rows, { searchInputId: 'locationsSearch' });
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);

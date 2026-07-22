@@ -19,8 +19,6 @@ if (!is_admin() && !is_region()) {
 
 $myRegionId = session_region_id();
 
-$search = trim((string)($_GET['q'] ?? ''));
-$statusFilter = trim((string)($_GET['status'] ?? ''));
 $seals = [];
 
 try {
@@ -34,14 +32,6 @@ try {
     if ($myRegionId !== null) {
         $sql .= ' AND s.region_id = ?';
         $params[] = $myRegionId;
-    }
-    if ($search !== '') {
-        $sql .= ' AND s.seal_id LIKE ?';
-        $params[] = '%' . $search . '%';
-    }
-    if ($statusFilter !== '' && in_array($statusFilter, SEAL_STATUSES, true)) {
-        $sql .= ' AND s.seal_status = ?';
-        $params[] = $statusFilter;
     }
     $sql .= ' ORDER BY s.id DESC';
 
@@ -75,37 +65,19 @@ require __DIR__ . '/../includes/header.php';
 
 <?= render_flash() ?>
 
-<div class="filter-bar mb-4">
-  <form method="get" action="<?= BASE_URL ?>/seals/list.php" class="row g-2 align-items-end">
-    <div class="col-md-5">
-      <label class="form-label" for="q">جستجو در شناسه پلمپ</label>
-      <div class="input-group">
-        <span class="input-group-text"><span class="iconify" data-icon="solar:magnifer-bold"></span></span>
-        <input type="text" class="form-control ltr-text" id="q" name="q" value="<?= e($search) ?>" placeholder="مثلاً SEAL-0001">
-      </div>
-    </div>
-    <div class="col-md-4">
-      <label class="form-label" for="status">وضعیت پلمپ</label>
-      <select class="form-select" id="status" name="status">
-        <option value="">همه وضعیت‌ها</option>
-        <?php foreach (SEAL_STATUSES as $s): ?>
-          <option value="<?= e($s) ?>" <?= $statusFilter === $s ? 'selected' : '' ?>><?= e($s) ?></option>
-        <?php endforeach; ?>
-      </select>
-    </div>
-    <div class="col-md-3 d-flex gap-2">
-      <button type="submit" class="btn btn-soft-purple d-flex align-items-center gap-2">
-        <span class="iconify" data-icon="solar:magnifer-bold"></span> اعمال
-      </button>
-      <a href="<?= BASE_URL ?>/seals/list.php" class="btn btn-outline-secondary">پاک‌کردن</a>
-    </div>
-  </form>
+<?php if ($seals): ?>
+<div class="filter-bar mb-3">
+  <div class="input-group" style="max-width: 340px;">
+    <span class="input-group-text"><span class="iconify" data-icon="solar:magnifer-bold"></span></span>
+    <input type="text" class="form-control" id="sealsSearch" placeholder="جستجوی سراسری (شناسه، وضعیت، منطقه و...)">
+  </div>
 </div>
+<?php endif; ?>
 
 <div class="card panel-card">
   <div class="card-body p-0">
     <?php if ($seals): ?>
-    <div id="gridSeals" class="seal-ag-grid ag-theme-quartz"></div>
+    <div id="gridSeals" class="seal-ag-grid"></div>
     <?php else: ?>
       <div class="text-center text-muted p-5">
         <span class="iconify fs-1 d-block mb-2" data-icon="solar:box-line-duotone"></span>
@@ -127,6 +99,13 @@ require __DIR__ . '/../includes/header.php';
       if (can_attach_seal_to_waybill() && $s['seal_status'] === 'در انبار منطقه') {
           $actions .= '<a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/seals/attach_waybill.php?id=' . (int)$s['id'] . '"><span class="iconify" data-icon="solar:link-bold"></span> الصاق به بارنامه</a>';
       }
+      if (can_manage_seals_master()) {
+          $actions .= '<form method="post" action="' . BASE_URL . '/seals/delete.php" class="d-inline" data-delete-form data-confirm="' . e('آیا از حذف پلمپ «' . $s['seal_id'] . '» مطمئن هستید؟') . '">'
+              . csrf_field()
+              . '<input type="hidden" name="id" value="' . (int)$s['id'] . '">'
+              . '<button type="submit" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"><span class="iconify" data-icon="solar:trash-bin-trash-bold"></span> حذف</button>'
+              . '</form>';
+      }
       $actions .= '</div>';
       return [
           'seal_id' => e($s['seal_id']),
@@ -143,11 +122,11 @@ require __DIR__ . '/../includes/header.php';
     { field: 'region', headerName: 'منطقه فعلی', flex: 1, html: true },
     { field: 'waybill_number', headerName: 'بارنامه الصاق‌شده', flex: 1, html: true, cellClass: 'ltr-text' },
     { field: 'created_at', headerName: 'تاریخ ایجاد', flex: 1, cellClass: 'ltr-text text-muted small' },
-    { field: 'actions', headerName: 'عملیات', flex: 2, html: true, sortable: false }
+    { field: 'actions', headerName: 'عملیات', flex: 2, html: true, sortable: false, filter: false }
   ];
   function boot() {
     if (typeof sealInitDataGrid === 'undefined') { setTimeout(boot, 30); return; }
-    sealInitDataGrid('gridSeals', columnDefs, rows);
+    sealInitDataGrid('gridSeals', columnDefs, rows, { searchInputId: 'sealsSearch' });
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
