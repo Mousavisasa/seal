@@ -40,53 +40,7 @@ require __DIR__ . '/../includes/header.php';
 <div class="card panel-card">
   <div class="card-body p-0">
     <?php if ($users): ?>
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>نام و نام خانوادگی</th>
-            <th>کد ملی</th>
-            <th>نقش</th>
-            <th>منطقه</th>
-            <th>وضعیت</th>
-            <th>تاریخ ثبت</th>
-            <th class="text-start">عملیات</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php foreach ($users as $u): ?>
-          <tr>
-            <td class="text-muted"><?= e((string)$u['id']) ?></td>
-            <td class="fw-bold"><?= e($u['first_name'] . ' ' . $u['last_name']) ?></td>
-            <td class="ltr-text"><?= e($u['national_code']) ?></td>
-            <td><span class="badge role-badge role-<?= e($u['user_type']) ?>"><?= e(user_type_label($u['user_type'])) ?></span></td>
-            <td><?= $u['region_name'] ? e($u['region_name']) : '<span class="text-muted">—</span>' ?></td>
-            <td>
-              <?php if ((int)$u['is_active'] === 1): ?>
-                <span class="status-badge status-delivered">فعال</span>
-              <?php else: ?>
-                <span class="status-badge status-cancelled">غیرفعال</span>
-              <?php endif; ?>
-            </td>
-            <td class="ltr-text text-muted small"><?= e(to_jalali_datetime_display($u['created_at'])) ?></td>
-            <td class="text-start">
-              <div class="d-flex gap-1 justify-content-start flex-wrap">
-                <a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                   href="<?= BASE_URL ?>/users/edit.php?id=<?= e((string)$u['id']) ?>">
-                  <span class="iconify" data-icon="solar:pen-bold"></span> ویرایش
-                </a>
-                <a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1"
-                   href="<?= BASE_URL ?>/users/reset_password.php?id=<?= e((string)$u['id']) ?>">
-                  <span class="iconify" data-icon="solar:key-bold"></span> بازنشانی رمز
-                </a>
-              </div>
-            </td>
-          </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
+    <div id="gridUsers" class="seal-ag-grid ag-theme-quartz"></div>
     <?php else: ?>
       <div class="text-center text-muted p-5">
         <span class="iconify fs-1 d-block mb-2" data-icon="solar:users-group-rounded-line-duotone"></span>
@@ -95,5 +49,48 @@ require __DIR__ . '/../includes/header.php';
     <?php endif; ?>
   </div>
 </div>
+
+<?php if ($users): ?>
+<script>
+(function () {
+  var rows = <?= json_encode(array_map(function ($u) {
+      return [
+          'id' => (int)$u['id'],
+          'name' => $u['first_name'] . ' ' . $u['last_name'],
+          'national_code' => $u['national_code'],
+          'role' => '<span class="badge role-badge role-' . e($u['user_type']) . '">' . e(user_type_label($u['user_type'])) . '</span>',
+          'region' => $u['region_name'] ? e($u['region_name']) : '<span class="text-muted">—</span>',
+          'status' => (int)$u['is_active'] === 1
+              ? '<span class="status-badge status-delivered">فعال</span>'
+              : '<span class="status-badge status-cancelled">غیرفعال</span>',
+          'created_at' => to_jalali_datetime_display($u['created_at']),
+          'actions' => '<div class="d-flex gap-1 flex-wrap">'
+              . '<a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/users/edit.php?id=' . (int)$u['id'] . '"><span class="iconify" data-icon="solar:pen-bold"></span> ویرایش</a>'
+              . '<a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/users/reset_password.php?id=' . (int)$u['id'] . '"><span class="iconify" data-icon="solar:key-bold"></span> بازنشانی رمز</a>'
+              . '</div>',
+      ];
+  }, $users), JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT) ?>;
+  var columnDefs = [
+    { field: 'id', headerName: '#', width: 70, cellClass: 'text-muted' },
+    { field: 'name', headerName: 'نام و نام خانوادگی', flex: 2, cellClass: 'fw-bold' },
+    { field: 'national_code', headerName: 'کد ملی', flex: 1, cellClass: 'ltr-text' },
+    { field: 'role', headerName: 'نقش', flex: 1, html: true },
+    { field: 'region', headerName: 'منطقه', flex: 1, html: true },
+    { field: 'status', headerName: 'وضعیت', flex: 1, html: true },
+    { field: 'created_at', headerName: 'تاریخ ثبت', flex: 1, cellClass: 'ltr-text text-muted small' },
+    { field: 'actions', headerName: 'عملیات', flex: 2, html: true, sortable: false }
+  ];
+  function boot() {
+    if (typeof sealInitDataGrid === 'undefined') { setTimeout(boot, 30); return; }
+    sealInitDataGrid('gridUsers', columnDefs, rows);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+<?php endif; ?>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>

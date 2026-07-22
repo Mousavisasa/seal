@@ -128,71 +128,7 @@ require __DIR__ . '/../includes/header.php';
 <div class="card panel-card">
   <div class="card-body p-0">
     <?php if ($waybills): ?>
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0">
-        <thead>
-          <tr>
-            <th>شماره بارنامه</th>
-            <th>مبدا</th>
-            <th>مقصد</th>
-            <th>مسافت (کیلومتر)</th>
-            <th>فرآورده</th>
-            <th>تاریخ صدور</th>
-            <th>وضعیت</th>
-            <th>پلمپ</th>
-            <th>متصدی مبدا</th>
-            <th>متصدی مقصد</th>
-            <th>راننده</th>
-            <th class="text-start">عملیات</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php foreach ($waybills as $w): ?>
-          <tr>
-            <td class="ltr-text fw-bold"><?= e($w['waybill_number']) ?></td>
-            <td><?= e($w['origin_title']) ?> <span class="text-muted small">(<?= e($w['origin_region_name']) ?>)</span></td>
-            <td><?= e($w['destination_title']) ?> <span class="text-muted small">(<?= e($w['destination_region_name']) ?>)</span></td>
-            <td class="ltr-text"><?= e(number_format((float)$w['distance_km'], 2)) ?></td>
-            <td><span class="product-badge <?= e(product_badge_class($w['product_type'])) ?>"><?= e($w['product_type']) ?></span></td>
-            <td class="ltr-text text-muted small"><?= e(to_jalali_display($w['issue_date'])) ?></td>
-            <td><span class="status-badge <?= e($statusClassMap[$w['send_status']] ?? '') ?>"><?= e($w['send_status']) ?></span></td>
-            <td class="ltr-text"><?= $w['attached_seal_id'] ? e($w['attached_seal_id']) : '<span class="text-muted">—</span>' ?></td>
-            <td><?= $w['origin_operator_first'] ? e($w['origin_operator_first'] . ' ' . $w['origin_operator_last']) : '<span class="text-muted">—</span>' ?></td>
-            <td>
-              <div class="d-flex align-items-center gap-2">
-                <span><?= $w['dest_operator_first'] ? e($w['dest_operator_first'] . ' ' . $w['dest_operator_last']) : '<span class="text-muted">—</span>' ?></span>
-                <?php if (can_assign_operator()): ?>
-                  <a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1"
-                     href="<?= BASE_URL ?>/waybills/assign_operator.php?id=<?= e((string)$w['id']) ?>&amp;side=destination"
-                     data-bs-toggle="tooltip" title="تخصیص یا تغییر متصدی مقصد">
-                    <span class="iconify" data-icon="<?= $w['dest_operator_first'] ? 'solar:pen-bold' : 'solar:add-circle-bold' ?>"></span>
-                    <?= $w['dest_operator_first'] ? 'تغییر' : 'تخصیص' ?>
-                  </a>
-                <?php endif; ?>
-              </div>
-            </td>
-            <td><?= $w['driver_first'] ? e($w['driver_first'] . ' ' . $w['driver_last']) : '<span class="text-muted">—</span>' ?></td>
-            <td class="text-start">
-              <div class="d-flex gap-1 justify-content-start flex-wrap">
-                <a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                   href="<?= BASE_URL ?>/waybills/edit.php?id=<?= e((string)$w['id']) ?>">
-                  <span class="iconify" data-icon="solar:pen-bold"></span> ویرایش
-                </a>
-                <form method="post" action="<?= BASE_URL ?>/waybills/delete.php"
-                      onsubmit="return confirm('آیا از حذف بارنامه «<?= e($w['waybill_number']) ?>» مطمئن هستید؟');">
-                  <?= csrf_field() ?>
-                  <input type="hidden" name="id" value="<?= e((string)$w['id']) ?>">
-                  <button type="submit" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1">
-                    <span class="iconify" data-icon="solar:trash-bin-trash-bold"></span> حذف
-                  </button>
-                </form>
-              </div>
-            </td>
-          </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
+    <div id="gridWaybills" class="seal-ag-grid ag-theme-quartz"></div>
     <?php else: ?>
       <div class="text-center text-muted p-5">
         <span class="iconify fs-1 d-block mb-2" data-icon="solar:fuel-line-duotone"></span>
@@ -201,5 +137,67 @@ require __DIR__ . '/../includes/header.php';
     <?php endif; ?>
   </div>
 </div>
+
+<?php if ($waybills): ?>
+<script>
+(function () {
+  var canAssignOperator = <?= can_assign_operator() ? 'true' : 'false' ?>;
+  var rows = <?= json_encode(array_map(function ($w) use ($statusClassMap) {
+      $destOperatorHtml = $w['dest_operator_first']
+          ? '<span>' . e($w['dest_operator_first'] . ' ' . $w['dest_operator_last']) . '</span>'
+          : '<span class="text-muted">—</span>';
+      if (can_assign_operator()) {
+          $destOperatorHtml = '<div class="d-flex align-items-center gap-2">' . $destOperatorHtml
+              . '<a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/waybills/assign_operator.php?id=' . (int)$w['id'] . '&side=destination" title="تخصیص یا تغییر متصدی مقصد">'
+              . '<span class="iconify" data-icon="' . ($w['dest_operator_first'] ? 'solar:pen-bold' : 'solar:add-circle-bold') . '"></span> '
+              . ($w['dest_operator_first'] ? 'تغییر' : 'تخصیص') . '</a></div>';
+      }
+      return [
+          'waybill_number' => e($w['waybill_number']),
+          'origin' => e($w['origin_title']) . ' <span class="text-muted small">(' . e($w['origin_region_name']) . ')</span>',
+          'destination' => e($w['destination_title']) . ' <span class="text-muted small">(' . e($w['destination_region_name']) . ')</span>',
+          'distance' => number_format((float)$w['distance_km'], 2),
+          'product' => '<span class="product-badge ' . e(product_badge_class($w['product_type'])) . '">' . e($w['product_type']) . '</span>',
+          'issue_date' => to_jalali_display($w['issue_date']),
+          'status' => '<span class="status-badge ' . e($statusClassMap[$w['send_status']] ?? '') . '">' . e($w['send_status']) . '</span>',
+          'seal' => $w['attached_seal_id'] ? e($w['attached_seal_id']) : '<span class="text-muted">—</span>',
+          'origin_operator' => $w['origin_operator_first'] ? e($w['origin_operator_first'] . ' ' . $w['origin_operator_last']) : '<span class="text-muted">—</span>',
+          'dest_operator' => $destOperatorHtml,
+          'driver' => $w['driver_first'] ? e($w['driver_first'] . ' ' . $w['driver_last']) : '<span class="text-muted">—</span>',
+          'actions' => '<div class="d-flex gap-1 flex-wrap">'
+              . '<a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/waybills/edit.php?id=' . (int)$w['id'] . '"><span class="iconify" data-icon="solar:pen-bold"></span> ویرایش</a>'
+              . '<form method="post" action="' . BASE_URL . '/waybills/delete.php" onsubmit="return confirm(\'آیا از حذف بارنامه «' . e($w['waybill_number']) . '» مطمئن هستید؟\');">'
+              . csrf_field()
+              . '<input type="hidden" name="id" value="' . (int)$w['id'] . '">'
+              . '<button type="submit" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"><span class="iconify" data-icon="solar:trash-bin-trash-bold"></span> حذف</button>'
+              . '</form></div>',
+      ];
+  }, $waybills), JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT | JSON_HEX_APOS) ?>;
+  var columnDefs = [
+    { field: 'waybill_number', headerName: 'شماره بارنامه', flex: 1, html: true, cellClass: 'ltr-text fw-bold' },
+    { field: 'origin', headerName: 'مبدا', flex: 1.5, html: true },
+    { field: 'destination', headerName: 'مقصد', flex: 1.5, html: true },
+    { field: 'distance', headerName: 'مسافت (کیلومتر)', flex: 1, cellClass: 'ltr-text' },
+    { field: 'product', headerName: 'فرآورده', flex: 1, html: true },
+    { field: 'issue_date', headerName: 'تاریخ صدور', flex: 1, cellClass: 'ltr-text text-muted small' },
+    { field: 'status', headerName: 'وضعیت', flex: 1, html: true },
+    { field: 'seal', headerName: 'پلمپ', flex: 1, html: true, cellClass: 'ltr-text' },
+    { field: 'origin_operator', headerName: 'متصدی مبدا', flex: 1, html: true },
+    { field: 'dest_operator', headerName: 'متصدی مقصد', flex: 1.5, html: true },
+    { field: 'driver', headerName: 'راننده', flex: 1, html: true },
+    { field: 'actions', headerName: 'عملیات', flex: 2, html: true, sortable: false }
+  ];
+  function boot() {
+    if (typeof sealInitDataGrid === 'undefined') { setTimeout(boot, 30); return; }
+    sealInitDataGrid('gridWaybills', columnDefs, rows);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+<?php endif; ?>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>

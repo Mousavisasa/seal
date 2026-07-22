@@ -17,10 +17,14 @@ $active = $active ?? '';
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/vazirmatn.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32/styles/ag-grid.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32/styles/ag-theme-quartz.min.css">
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
 <script src="<?= BASE_URL ?>/assets/js/iconify.min.js"></script>
 <script src="<?= BASE_URL ?>/assets/js/iconify-icons.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32/dist/ag-grid-community.min.js"></script>
+<script src="<?= BASE_URL ?>/assets/js/ag-grid-helpers.js"></script>
 <script>window.MAPIR_API_KEY = <?= json_encode(MAPIR_API_KEY) ?>;</script>
 </head>
 <body class="panel-body">

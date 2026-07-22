@@ -65,31 +65,7 @@ require __DIR__ . '/../includes/header.php';
 <div class="card panel-card">
   <div class="card-body p-0">
     <?php if ($regions): ?>
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0">
-        <thead>
-          <tr>
-            <th>کد منطقه</th>
-            <th>نام منطقه</th>
-            <th class="text-start">عملیات</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php foreach ($regions as $r): ?>
-          <tr>
-            <td class="ltr-text fw-bold"><?= e((string)$r['region_code']) ?></td>
-            <td><?= e($r['region_name']) ?></td>
-            <td class="text-start">
-              <a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1"
-                 href="<?= BASE_URL ?>/regions/edit.php?code=<?= e((string)$r['region_code']) ?>">
-                <span class="iconify" data-icon="solar:pen-bold"></span> ویرایش
-              </a>
-            </td>
-          </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
+    <div id="gridRegions" class="seal-ag-grid ag-theme-quartz"></div>
     <?php else: ?>
       <div class="text-center text-muted p-5">
         <span class="iconify fs-1 d-block mb-2" data-icon="solar:map-point-line-duotone"></span>
@@ -98,5 +74,33 @@ require __DIR__ . '/../includes/header.php';
     <?php endif; ?>
   </div>
 </div>
+
+<?php if ($regions): ?>
+<script>
+(function () {
+  var rows = <?= json_encode(array_map(function ($r) {
+      return [
+          'region_code' => e((string)$r['region_code']),
+          'region_name' => e($r['region_name']),
+          'actions' => '<a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/regions/edit.php?code=' . (int)$r['region_code'] . '"><span class="iconify" data-icon="solar:pen-bold"></span> ویرایش</a>',
+      ];
+  }, $regions), JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT) ?>;
+  var columnDefs = [
+    { field: 'region_code', headerName: 'کد منطقه', flex: 1, html: true, cellClass: 'ltr-text fw-bold' },
+    { field: 'region_name', headerName: 'نام منطقه', flex: 2, html: true },
+    { field: 'actions', headerName: 'عملیات', flex: 1, html: true, sortable: false }
+  ];
+  function boot() {
+    if (typeof sealInitDataGrid === 'undefined') { setTimeout(boot, 30); return; }
+    sealInitDataGrid('gridRegions', columnDefs, rows);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+<?php endif; ?>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>

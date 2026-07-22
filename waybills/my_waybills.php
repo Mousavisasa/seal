@@ -56,56 +56,7 @@ require __DIR__ . '/../includes/header.php';
 <div class="card panel-card">
   <div class="card-body p-0">
     <?php if ($waybills): ?>
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0">
-        <thead>
-          <tr>
-            <th>شماره بارنامه</th>
-            <th>مبدا</th>
-            <th>مقصد</th>
-            <th>نقش من</th>
-            <th>فرآورده</th>
-            <th>تاریخ صدور</th>
-            <th>وضعیت</th>
-            <th>راننده</th>
-            <th class="text-start">عملیات</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php foreach ($waybills as $w): ?>
-          <?php
-            $myRoles = [];
-            if ((int)$w['origin_operator_user_id'] === (int)$_SESSION['user_id']) {
-                $myRoles[] = 'متصدی مبدا';
-            }
-            if ((int)$w['destination_operator_user_id'] === (int)$_SESSION['user_id']) {
-                $myRoles[] = 'متصدی مقصد';
-            }
-          ?>
-          <tr>
-            <td class="ltr-text fw-bold"><?= e($w['waybill_number']) ?></td>
-            <td><?= e($w['origin_title']) ?></td>
-            <td><?= e($w['destination_title']) ?></td>
-            <td>
-              <?php foreach ($myRoles as $role): ?>
-                <span class="badge role-badge role-region"><?= e($role) ?></span>
-              <?php endforeach; ?>
-            </td>
-            <td><span class="product-badge <?= e(product_badge_class($w['product_type'])) ?>"><?= e($w['product_type']) ?></span></td>
-            <td class="ltr-text text-muted small"><?= e(to_jalali_display($w['issue_date'])) ?></td>
-            <td><span class="status-badge <?= e($statusClassMap[$w['send_status']] ?? '') ?>"><?= e($w['send_status']) ?></span></td>
-            <td><?= $w['driver_first'] ? e($w['driver_first'] . ' ' . $w['driver_last']) : '<span class="text-muted">تخصیص‌نیافته</span>' ?></td>
-            <td class="text-start">
-              <a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1"
-                 href="<?= BASE_URL ?>/waybills/assign_driver.php?id=<?= e((string)$w['id']) ?>">
-                <span class="iconify" data-icon="solar:bus-bold"></span> تخصیص راننده
-              </a>
-            </td>
-          </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
+    <div id="gridMyWaybills" class="seal-ag-grid ag-theme-quartz"></div>
     <?php else: ?>
       <div class="text-center text-muted p-5">
         <span class="iconify fs-1 d-block mb-2" data-icon="solar:fuel-line-duotone"></span>
@@ -114,5 +65,55 @@ require __DIR__ . '/../includes/header.php';
     <?php endif; ?>
   </div>
 </div>
+
+<?php if ($waybills): ?>
+<script>
+(function () {
+  var rows = <?= json_encode(array_map(function ($w) use ($statusClassMap) {
+      $myRoles = [];
+      if ((int)$w['origin_operator_user_id'] === (int)$_SESSION['user_id']) {
+          $myRoles[] = 'متصدی مبدا';
+      }
+      if ((int)$w['destination_operator_user_id'] === (int)$_SESSION['user_id']) {
+          $myRoles[] = 'متصدی مقصد';
+      }
+      $rolesHtml = implode(' ', array_map(function ($role) {
+          return '<span class="badge role-badge role-region">' . e($role) . '</span>';
+      }, $myRoles));
+      return [
+          'waybill_number' => e($w['waybill_number']),
+          'origin' => e($w['origin_title']),
+          'destination' => e($w['destination_title']),
+          'roles' => $rolesHtml,
+          'product' => '<span class="product-badge ' . e(product_badge_class($w['product_type'])) . '">' . e($w['product_type']) . '</span>',
+          'issue_date' => to_jalali_display($w['issue_date']),
+          'status' => '<span class="status-badge ' . e($statusClassMap[$w['send_status']] ?? '') . '">' . e($w['send_status']) . '</span>',
+          'driver' => $w['driver_first'] ? e($w['driver_first'] . ' ' . $w['driver_last']) : '<span class="text-muted">تخصیص‌نیافته</span>',
+          'actions' => '<a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/waybills/assign_driver.php?id=' . (int)$w['id'] . '"><span class="iconify" data-icon="solar:bus-bold"></span> تخصیص راننده</a>',
+      ];
+  }, $waybills), JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT) ?>;
+  var columnDefs = [
+    { field: 'waybill_number', headerName: 'شماره بارنامه', flex: 1, html: true, cellClass: 'ltr-text fw-bold' },
+    { field: 'origin', headerName: 'مبدا', flex: 1, html: true },
+    { field: 'destination', headerName: 'مقصد', flex: 1, html: true },
+    { field: 'roles', headerName: 'نقش من', flex: 1, html: true },
+    { field: 'product', headerName: 'فرآورده', flex: 1, html: true },
+    { field: 'issue_date', headerName: 'تاریخ صدور', flex: 1, cellClass: 'ltr-text text-muted small' },
+    { field: 'status', headerName: 'وضعیت', flex: 1, html: true },
+    { field: 'driver', headerName: 'راننده', flex: 1, html: true },
+    { field: 'actions', headerName: 'عملیات', flex: 1, html: true, sortable: false }
+  ];
+  function boot() {
+    if (typeof sealInitDataGrid === 'undefined') { setTimeout(boot, 30); return; }
+    sealInitDataGrid('gridMyWaybills', columnDefs, rows);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+<?php endif; ?>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>

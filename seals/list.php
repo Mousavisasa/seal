@@ -105,51 +105,7 @@ require __DIR__ . '/../includes/header.php';
 <div class="card panel-card">
   <div class="card-body p-0">
     <?php if ($seals): ?>
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0">
-        <thead>
-          <tr>
-            <th>شناسه پلمپ</th>
-            <th>وضعیت</th>
-            <th>منطقه فعلی</th>
-            <th>بارنامه الصاق‌شده</th>
-            <th>تاریخ ایجاد</th>
-            <th class="text-start">عملیات</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php foreach ($seals as $s): ?>
-          <tr>
-            <td class="ltr-text fw-bold"><?= e($s['seal_id']) ?></td>
-            <td><span class="status-badge <?= e(seal_status_class($s['seal_status'])) ?>"><?= e($s['seal_status']) ?></span></td>
-            <td><?= $s['region_name'] ? e($s['region_name']) : '<span class="text-muted">انبار مرکزی</span>' ?></td>
-            <td class="ltr-text"><?= $s['waybill_number'] ? e($s['waybill_number']) : '<span class="text-muted">—</span>' ?></td>
-            <td class="ltr-text text-muted small"><?= e(to_jalali_display($s['created_at'])) ?></td>
-            <td class="text-start">
-              <div class="d-flex gap-1 justify-content-start flex-wrap">
-                <a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                   href="<?= BASE_URL ?>/seals/view.php?id=<?= e((string)$s['id']) ?>">
-                  <span class="iconify" data-icon="solar:eye-bold"></span> جزئیات
-                </a>
-                <?php if (can_assign_seal_to_region()): ?>
-                  <a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1"
-                     href="<?= BASE_URL ?>/seals/assign_region.php?id=<?= e((string)$s['id']) ?>">
-                    <span class="iconify" data-icon="solar:map-point-bold"></span> تخصیص منطقه
-                  </a>
-                <?php endif; ?>
-                <?php if (can_attach_seal_to_waybill() && $s['seal_status'] === 'در انبار منطقه'): ?>
-                  <a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1"
-                     href="<?= BASE_URL ?>/seals/attach_waybill.php?id=<?= e((string)$s['id']) ?>">
-                    <span class="iconify" data-icon="solar:link-bold"></span> الصاق به بارنامه
-                  </a>
-                <?php endif; ?>
-              </div>
-            </td>
-          </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
+    <div id="gridSeals" class="seal-ag-grid ag-theme-quartz"></div>
     <?php else: ?>
       <div class="text-center text-muted p-5">
         <span class="iconify fs-1 d-block mb-2" data-icon="solar:box-line-duotone"></span>
@@ -158,5 +114,48 @@ require __DIR__ . '/../includes/header.php';
     <?php endif; ?>
   </div>
 </div>
+
+<?php if ($seals): ?>
+<script>
+(function () {
+  var rows = <?= json_encode(array_map(function ($s) {
+      $actions = '<div class="d-flex gap-1 flex-wrap">'
+          . '<a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/seals/view.php?id=' . (int)$s['id'] . '"><span class="iconify" data-icon="solar:eye-bold"></span> جزئیات</a>';
+      if (can_assign_seal_to_region()) {
+          $actions .= '<a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/seals/assign_region.php?id=' . (int)$s['id'] . '"><span class="iconify" data-icon="solar:map-point-bold"></span> تخصیص منطقه</a>';
+      }
+      if (can_attach_seal_to_waybill() && $s['seal_status'] === 'در انبار منطقه') {
+          $actions .= '<a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/seals/attach_waybill.php?id=' . (int)$s['id'] . '"><span class="iconify" data-icon="solar:link-bold"></span> الصاق به بارنامه</a>';
+      }
+      $actions .= '</div>';
+      return [
+          'seal_id' => e($s['seal_id']),
+          'status' => '<span class="status-badge ' . e(seal_status_class($s['seal_status'])) . '">' . e($s['seal_status']) . '</span>',
+          'region' => $s['region_name'] ? e($s['region_name']) : '<span class="text-muted">انبار مرکزی</span>',
+          'waybill_number' => $s['waybill_number'] ? e($s['waybill_number']) : '<span class="text-muted">—</span>',
+          'created_at' => to_jalali_display($s['created_at']),
+          'actions' => $actions,
+      ];
+  }, $seals), JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT) ?>;
+  var columnDefs = [
+    { field: 'seal_id', headerName: 'شناسه پلمپ', flex: 1, html: true, cellClass: 'ltr-text fw-bold' },
+    { field: 'status', headerName: 'وضعیت', flex: 1, html: true },
+    { field: 'region', headerName: 'منطقه فعلی', flex: 1, html: true },
+    { field: 'waybill_number', headerName: 'بارنامه الصاق‌شده', flex: 1, html: true, cellClass: 'ltr-text' },
+    { field: 'created_at', headerName: 'تاریخ ایجاد', flex: 1, cellClass: 'ltr-text text-muted small' },
+    { field: 'actions', headerName: 'عملیات', flex: 2, html: true, sortable: false }
+  ];
+  function boot() {
+    if (typeof sealInitDataGrid === 'undefined') { setTimeout(boot, 30); return; }
+    sealInitDataGrid('gridSeals', columnDefs, rows);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+<?php endif; ?>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>
