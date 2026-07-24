@@ -25,8 +25,25 @@ define('DB_USER', 'idtoir_smart_seal');
 define('DB_PASS', 'MyPass@1234');
 define('DB_CHARSET', 'utf8mb4');
 
-// مسیر پایه پروژه (نام پوشه در htdocs)
-define('BASE_URL', '/seal');
+// مسیر پایه پروژه (محاسبه دینامیک)
+if (!defined('BASE_URL')) {
+    // مسیر واقعی فولدر پروژه (یک سطح بالاتر از config)
+    $project_root = realpath(dirname(__DIR__));
+    
+    // مسیر document root وب‌سرور
+    $document_root = realpath($_SERVER['DOCUMENT_ROOT'] ?? '');
+    
+    // محاسبه BASE_URL: تفریق document_root از project_root
+    if ($document_root && $project_root) {
+        // تبدیل backslash به forward slash (برای Windows)
+        $relative_path = str_replace('\\', '/', substr($project_root, strlen($document_root)));
+        define('BASE_URL', $relative_path ?: '');
+    } else {
+        // fallback: استفاده از SCRIPT_NAME
+        $script_dir = dirname($_SERVER['SCRIPT_NAME'] ?? '/');
+        define('BASE_URL', $script_dir !== '/' ? rtrim($script_dir, '/') : '');
+    }
+}
 
 // عنوان سامانه
 define('APP_NAME', 'سامانه مدیریت پلمپ هوشمند');
