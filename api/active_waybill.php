@@ -97,26 +97,10 @@ try {
     }
 
     $waybill = [
-        'id'                   => (int)$w['id'],
-        'waybill_number'       => $w['waybill_number'],
-        'issue_date'           => $w['issue_date'],
-        'issue_date_jalali'    => to_jalali_display($w['issue_date']),
-        'distance_km'          => (float)$w['distance_km'],
-        'product_type'         => $w['product_type'],
-        'send_status'          => $w['send_status'],
-        'trip_started_at'      => $w['trip_started_at'],
-        'origin_title'         => $w['origin_title'],
-        'origin_lat'           => (float)$w['origin_lat'],
-        'origin_lon'           => (float)$w['origin_lon'],
-        'destination_title'    => $w['destination_title'],
-        'destination_lat'      => (float)$w['destination_lat'],
-        'destination_lon'      => (float)$w['destination_lon'],
-        'origin_operator'      => $w['origin_operator_first'] ? trim($w['origin_operator_first'] . ' ' . $w['origin_operator_last']) : null,
-        'destination_operator' => $w['dest_operator_first'] ? trim($w['dest_operator_first'] . ' ' . $w['dest_operator_last']) : null,
+        'characteristic_uuid'  => $w['characteristic_uuid'],
         'seal_id'              => $w['attached_seal_id'],
         'seal_password'        => $w['seal_password'],
-        'service_uuid'         => $w['service_uuid'],
-        'characteristic_uuid'  => $w['characteristic_uuid'],
+        'service_uuid'         => $w['service_uuid']
     ];
 
     json_response(200, true, 'بارنامه ی انتخاب شده با موفقیت دریافت شد.', $waybill, true);
