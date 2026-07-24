@@ -15,6 +15,7 @@ $errors = [];
 $current = get_settings([
     SETTING_DEFAULT_SERVICE_UUID        => '',
     SETTING_DEFAULT_CHARACTERISTIC_UUID => '',
+    SETTING_GEOFENCE_CONTROL_ENABLED     => '1',
 ]);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -23,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $current[SETTING_DEFAULT_SERVICE_UUID]        = trim((string)($_POST['default_service_uuid'] ?? ''));
         $current[SETTING_DEFAULT_CHARACTERISTIC_UUID] = trim((string)($_POST['default_characteristic_uuid'] ?? ''));
+        $current[SETTING_GEOFENCE_CONTROL_ENABLED]     = isset($_POST['geofence_control_enabled']) ? '1' : '0';
 
         if (mb_strlen($current[SETTING_DEFAULT_SERVICE_UUID]) > 100) {
             $errors[] = 'Service UUID پیش‌فرض باید حداکثر ۱۰۰ کاراکتر باشد.';
@@ -33,7 +35,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!$errors) {
             $ok = set_setting(SETTING_DEFAULT_SERVICE_UUID, $current[SETTING_DEFAULT_SERVICE_UUID])
-                && set_setting(SETTING_DEFAULT_CHARACTERISTIC_UUID, $current[SETTING_DEFAULT_CHARACTERISTIC_UUID]);
+                && set_setting(SETTING_DEFAULT_CHARACTERISTIC_UUID, $current[SETTING_DEFAULT_CHARACTERISTIC_UUID])
+                && set_setting(SETTING_GEOFENCE_CONTROL_ENABLED, $current[SETTING_GEOFENCE_CONTROL_ENABLED]);
 
             if ($ok) {
                 set_flash('success', 'تنظیمات با موفقیت ذخیره شد.');
@@ -67,6 +70,35 @@ require __DIR__ . '/../includes/header.php';
 <?php endif; ?>
 
 <div class="card panel-card">
+  <div class="card-body p-4">
+    <h2 class="h6 fw-bold mb-3 d-flex align-items-center gap-2">
+      <span class="iconify fs-5" data-icon="solar:settings-bold"></span> تنظیمات عمومی
+    </h2>
+    <form method="post" action="<?= BASE_URL ?>/settings/index.php" novalidate>
+      <?= csrf_field() ?>
+      <div class="row g-3">
+        <div class="col-12">
+          <div class="form-check form-switch">
+            <input type="checkbox" class="form-check-input" id="geofence_control_enabled" name="geofence_control_enabled"
+                   <?php if ((int)$current[SETTING_GEOFENCE_CONTROL_ENABLED] === 1): ?>checked<?php endif; ?>>
+            <label class="form-check-label" for="geofence_control_enabled">
+              <span class="fw-bold">کنترل حصار جغرافیایی (جئوفنس) راننده</span>
+              <div class="small text-muted d-block">هنگام شروع و پایان سفر، موقعیت مکانی راننده بررسی می‌شود.</div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-primary d-flex align-items-center gap-2">
+          <span class="iconify" data-icon="solar:diskette-bold"></span> ذخیره تنظیمات
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card panel-card mt-4">
   <div class="card-body p-4">
     <h2 class="h6 fw-bold mb-3 d-flex align-items-center gap-2">
       <span class="iconify fs-5" data-icon="mdi:bluetooth"></span> مقادیر پیش‌فرض بلوتوث پلمپ (BLE)
