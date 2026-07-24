@@ -3,10 +3,10 @@
   <component name="PublishConfigData" serverName="myftp" uploadOnCheckin="37410dcf-67fe-4671-8c1e-747011cf969e" remoteFilesAllowedToDisappearOnAutoupload="false" confirmBeforeUploading="false">
     <option name="confirmBeforeUploading" value="false" />
     <serverData>
-      <paths name="Local or mounted folder">
+      <paths name="javad">
         <serverdata>
           <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
