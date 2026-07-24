@@ -278,8 +278,8 @@ if ($driver) {
   window.GEOFENCE_ENABLED = <?= json_encode($geofenceEnabled) ?>;
 </script>
 <?php if (!$errors): ?>
-<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <?php if ($geofenceEnabled): ?>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function () {
   var TARGET_LOCATION_ID = <?= (int)$targetLocationId ?>;
@@ -430,7 +430,9 @@ if ($driver) {
   // دریافت خودکار موقعیت هنگام بارگذاری صفحه
   locate();
 })();
+</script>
 <?php else: ?>
+<script>
 (function () {
   var LOADING_PAGE_URL = '<?= BASE_URL ?>/waybill_trip_loading.php';
   var TOKEN = <?= json_encode($token) ?>;
@@ -441,8 +443,8 @@ if ($driver) {
     window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN);
   });
 })();
-<?php endif; ?>
 </script>
+<?php endif; ?>
 <?php endif; ?>
 </body>
 </html>
