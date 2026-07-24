@@ -129,6 +129,11 @@ $active = $active ?? '';
           <span class="iconify" data-icon="solar:chat-square-code-bold-duotone"></span> تست وب‌سرویس
         </a>
       </li>
+      <li>
+        <a href="<?= BASE_URL ?>/settings/index.php" class="<?= $active === 'settings' ? 'active' : '' ?>">
+          <span class="iconify" data-icon="solar:settings-bold-duotone"></span> تنظیمات
+        </a>
+      </li>
       <?php endif; ?>
 
       <li class="mt-auto">

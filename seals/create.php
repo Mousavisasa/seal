@@ -5,11 +5,18 @@
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../helpers/auth.php';
 require_once __DIR__ . '/../helpers/seals.php';
+require_once __DIR__ . '/../helpers/settings.php';
 
 require_seals_master_access();
 
 $errors = [];
-$old = ['seal_id' => '', 'seal_password' => '', 'service_uuid' => '', 'characteristic_uuid' => ''];
+// مقادیر پیش‌فرض UUID از بخش «تنظیمات» به‌عنوان پیشنهاد اولیه در فرم نمایش داده می‌شود
+$old = [
+    'seal_id' => '',
+    'seal_password' => '',
+    'service_uuid' => get_setting(SETTING_DEFAULT_SERVICE_UUID, ''),
+    'characteristic_uuid' => get_setting(SETTING_DEFAULT_CHARACTERISTIC_UUID, ''),
+];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf()) {
@@ -121,6 +128,7 @@ require __DIR__ . '/../includes/header.php';
             <span class="input-group-text"><span class="iconify" data-icon="mdi:bluetooth"></span></span>
             <input type="text" class="form-control ltr-text" id="service_uuid" name="service_uuid" required maxlength="100" value="<?= e($old['service_uuid']) ?>" placeholder="مثلاً 0000180f-0000-1000-8000-00805f9b34fb">
           </div>
+          <div class="form-text">مقدار پیشنهادی از <a href="<?= BASE_URL ?>/settings/index.php" target="_blank">تنظیمات برنامه</a> پر شده؛ در صورت نیاز آن را ویرایش کنید.</div>
         </div>
 
         <div class="col-md-6">
@@ -129,6 +137,7 @@ require __DIR__ . '/../includes/header.php';
             <span class="input-group-text"><span class="iconify" data-icon="mdi:bluetooth-audio"></span></span>
             <input type="text" class="form-control ltr-text" id="characteristic_uuid" name="characteristic_uuid" required maxlength="100" value="<?= e($old['characteristic_uuid']) ?>" placeholder="مثلاً 00002a19-0000-1000-8000-00805f9b34fb">
           </div>
+          <div class="form-text">مقدار پیشنهادی از <a href="<?= BASE_URL ?>/settings/index.php" target="_blank">تنظیمات برنامه</a> پر شده؛ در صورت نیاز آن را ویرایش کنید.</div>
         </div>
       </div>
 

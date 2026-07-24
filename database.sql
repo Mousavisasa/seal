@@ -184,6 +184,17 @@ CREATE TABLE IF NOT EXISTS `seal_movements` (
     ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ---------- جدول تنظیمات کلی برنامه (کلید/مقدار) ----------
+-- برای نگهداری مقادیر پیش‌فرض مانند Service UUID و Characteristic UUID پلمپ
+CREATE TABLE IF NOT EXISTS `app_settings` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `setting_key` VARCHAR(100) NOT NULL,
+  `setting_value` VARCHAR(255) NULL DEFAULT NULL,
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_app_settings_key` (`setting_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ---------- داده نمونه: مناطق ----------
 INSERT INTO `regions` (`region_code`, `region_name`) VALUES
   (1, 'تهران'),
@@ -287,5 +298,16 @@ INSERT INTO `seals` (`seal_id`, `seal_password`, `seal_status`, `region_id`, `cr
 -- ALTER TABLE `seals`
 --   ADD COLUMN `service_uuid` VARCHAR(100) NULL DEFAULT NULL AFTER `seal_password`,
 --   ADD COLUMN `characteristic_uuid` VARCHAR(100) NULL DEFAULT NULL AFTER `service_uuid`;
+--
+-- 8) افزودن بخش «تنظیمات برنامه» (ذخیره تنظیمات کلید/مقدار؛ برای مقادیر پیش‌فرض
+--    Service UUID و Characteristic UUID در فرم تعریف پلمپ):
+-- CREATE TABLE IF NOT EXISTS `app_settings` (
+--   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+--   `setting_key` VARCHAR(100) NOT NULL,
+--   `setting_value` VARCHAR(255) NULL DEFAULT NULL,
+--   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+--   PRIMARY KEY (`id`),
+--   UNIQUE KEY `uk_app_settings_key` (`setting_key`)
+-- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
