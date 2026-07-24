@@ -28,6 +28,23 @@ headerTooltip, headerComponentParams, ...
 - **روش:** `cellRenderer` یک div با `innerHTML` برمی‌گرداند
 - **نتیجه:** HTML محتوا (buttons, forms, badges) درست رندر می‌شود
 
+### 3️⃣ AG Grid Button Styling (Fixed ✓)
+
+**مشکل:** دکمه‌های داخل جدول‌ها:
+- ✗ اندازه یکسانی ندارند
+- ✗ ارتفاع نامتناسب است
+- ✗ فونت خیلی بزرگ است
+
+**علت:** دکمه‌ها از Bootstrap `btn` و `btn-sm` استفاده می‌کنند، اما Bootstrap styling برای سلول‌های جدول مناسب نیست.
+
+**راه‌حل:** CSS rules خاص برای دکمه‌های داخل grid cells:
+- **فایل:** `assets/css/style.css` (خطوط 465-495)
+- **تغییرات:** 
+  - Font size: `0.75rem` (ریزتر)
+  - Height: `28px` (یکسان)
+  - Padding: `0.35rem 0.65rem` (فشرده‌تر)
+- **نتیجه:** دکمه‌های یکسان و متناسب
+
 ## فایل‌های تغییر‌یافته
 
 ### 1. `config/config.php`
@@ -61,6 +78,20 @@ headerTooltip, headerComponentParams, ...
   }
 ```
 
+### 3. `assets/css/style.css`
+```css
+/* دکمه‌های داخل سلول‌های گرید — استاندارد و یکنواخت */
+.seal-ag-grid .ag-cell .btn {
+  padding: 0.35rem 0.65rem !important;
+  font-size: 0.75rem !important;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+```
+
 ## صفحات تحت تأثیر
 
 ### BASE_URL Fix تأثیر می‌گذارد بر:
@@ -69,7 +100,7 @@ headerTooltip, headerComponentParams, ...
 - ✓ Form actions و redirects
 - ✓ API endpoint calls
 
-### AG Grid Fix تأثیر می‌گذارد بر:
+### AG Grid Fixes تأثیر می‌گذارند بر:
 - `waybills/list.php`
 - `waybills/my_waybills.php`
 - `locations/list.php`
@@ -88,7 +119,7 @@ http://localhost/seal/users/list.php
 ```
 → CSS/JS بدون 404 errors بارگذاری شود
 
-### ✓ AG Grid Tests
+### ✓ AG Grid HTML Rendering Tests
 ```
 http://localhost/seal/waybills/list.php
 http://localhost/seal/users/list.php
@@ -97,10 +128,19 @@ http://localhost/seal/locations/list.php
 → Developer Console خالی از AG Grid errors باشد  
 → دکمه‌های delete/edit درست رندر شوند
 
+### ✓ Button Styling Tests
+```
+http://localhost/seal/waybills/list.php
+```
+→ تمام دکمه‌ها ارتفاع یکسان داشته باشند ✓
+→ فونت ریز باشد ✓
+→ فاصله‌ی مناسب بین دکمه‌ها باشد ✓
+
 ## توثیق
 
 - `DEPLOYMENT_GUIDE.md` - راهنمای استقرار پروژه
-- `AG_GRID_FIX_SUMMARY.md` - توضیح تغییر AG Grid
+- `AG_GRID_FIX_SUMMARY.md` - توضیح تغییر AG Grid HTML Rendering
+- `GRID_BUTTON_STYLING_FIX.md` - توضیح تغییر Button Styling
 
 ## Notes
 
@@ -108,3 +148,4 @@ http://localhost/seal/locations/list.php
 2. هیچ تغییری در دیگر فایل‌های PHP یا JS نلازم
 3. پروژه اکنون portable است (هر جای قرار بگیرد کار می‌کند)
 4. تمام features قدیمی کار می‌کنند
+5. دکمه‌های جدول اکنون متناسب و یکنواخت هستند

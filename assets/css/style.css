@@ -461,6 +461,39 @@ body { background: var(--surface); color: var(--ink); }
 .seal-ag-grid .ag-cell .badge,
 .seal-ag-grid .ag-cell .status-badge,
 .seal-ag-grid .ag-cell .product-badge { margin: 0; }
+
+/* دکمه‌های داخل سلول‌های گرید — استاندارد و یکنواخت */
+.seal-ag-grid .ag-cell .btn {
+  padding: 0.35rem 0.65rem !important;
+  font-size: 0.75rem !important;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.seal-ag-grid .ag-cell .btn.btn-sm {
+  padding: 0.35rem 0.65rem !important;
+  font-size: 0.75rem !important;
+  line-height: 1 !important;
+}
+
+.seal-ag-grid .ag-cell .btn .iconify {
+  font-size: 0.75rem;
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+/* فاصله بین دکمه‌های متوالی در یک سلول */
+.seal-ag-grid .ag-cell .d-flex.gap-1 {
+  gap: 0.5rem !important;
+}
+
+.seal-ag-grid .ag-cell .d-flex.gap-2 {
+  gap: 0.6rem !important;
+}
+
 .dashboard-role-badge {
   display: inline-flex; align-items: center; gap: .4rem;
   background: linear-gradient(90deg, var(--jade-soft), var(--purple-soft));
