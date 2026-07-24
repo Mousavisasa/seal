@@ -35,7 +35,17 @@
 
     columnDefs.forEach(function (col) {
       if (col.html) {
-        col.cellRenderer = function (params) { return params.value; };
+        // استفاده از cellRenderer برای رندر کردن HTML
+        col.cellRenderer = function (params) {
+          // ایجاد یک div و تنظیم innerHTML
+          var div = document.createElement('div');
+          if (params.value) {
+            div.innerHTML = params.value;
+          }
+          return div;
+        };
+        // حذف property html تا AG Grid خطا نداده
+        delete col.html;
       }
       if (col.filter === undefined) {
         col.filter = true;
