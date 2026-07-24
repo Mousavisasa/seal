@@ -462,6 +462,12 @@ body { background: var(--surface); color: var(--ink); }
 .seal-ag-grid .ag-cell .status-badge,
 .seal-ag-grid .ag-cell .product-badge { margin: 0; }
 
+/* سلول‌های گرید با flexbox برای center کردن دکمه‌ها */
+.seal-ag-grid .ag-cell {
+  display: flex !important;
+  align-items: center !important;
+}
+
 /* دکمه‌های داخل سلول‌های گرید — استاندارد و یکنواخت */
 .seal-ag-grid .ag-cell .btn {
   padding: 0.35rem 0.65rem !important;
@@ -483,6 +489,37 @@ body { background: var(--surface); color: var(--ink); }
   font-size: 0.75rem;
   width: 0.85rem;
   height: 0.85rem;
+}
+
+/* تم یکسان برای دکمه‌های ویرایش و حذف */
+.seal-ag-grid .ag-cell .btn-outline-secondary,
+.seal-ag-grid .ag-cell .btn-outline-danger {
+  border-width: 1px !important;
+  font-weight: 500;
+}
+
+.seal-ag-grid .ag-cell .btn-outline-secondary {
+  color: #6c757d !important;
+  border-color: #6c757d !important;
+  background-color: transparent !important;
+}
+
+.seal-ag-grid .ag-cell .btn-outline-secondary:hover {
+  color: #fff !important;
+  background-color: #6c757d !important;
+  border-color: #6c757d !important;
+}
+
+.seal-ag-grid .ag-cell .btn-outline-danger {
+  color: #dc3545 !important;
+  border-color: #dc3545 !important;
+  background-color: transparent !important;
+}
+
+.seal-ag-grid .ag-cell .btn-outline-danger:hover {
+  color: #fff !important;
+  background-color: #dc3545 !important;
+  border-color: #dc3545 !important;
 }
 
 /* فاصله بین دکمه‌های متوالی در یک سلول */

@@ -75,7 +75,7 @@ require __DIR__ . '/../includes/header.php';
           'coords' => $coords,
           'actions' => '<div class="d-flex gap-2 justify-content-end">'
               . '<a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/map/index.php?location_id=' . (int)$l['id'] . '"><span class="iconify" data-icon="solar:map-point-bold"></span> نقشه</a>'
-              . '<a class="btn btn-sm btn-soft-purple d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/locations/edit.php?id=' . (int)$l['id'] . '"><span class="iconify" data-icon="solar:pen-bold"></span> ویرایش</a>'
+              . '<a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" href="' . BASE_URL . '/locations/edit.php?id=' . (int)$l['id'] . '"><span class="iconify" data-icon="solar:pen-bold"></span> ویرایش</a>'
               . '<form method="post" action="' . BASE_URL . '/locations/delete.php" class="d-inline" data-delete-form data-confirm="' . e('آیا از حذف مکان «' . $l['title'] . '» مطمئن هستید؟') . '">'
               . csrf_field()
               . '<input type="hidden" name="id" value="' . (int)$l['id'] . '">'
