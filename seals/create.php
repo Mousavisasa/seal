@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     );
                     $stmt->execute([
                         $old['seal_id'],
-                        password_hash($sealPassword, PASSWORD_DEFAULT),
+                        $sealPassword,
                         $old['service_uuid'],
                         $old['characteristic_uuid'],
                         'در انبار مرکزی',
