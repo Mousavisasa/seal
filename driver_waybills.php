@@ -106,7 +106,7 @@ if ($driver) {
              LEFT JOIN users opOrig ON opOrig.id = w.origin_operator_user_id
              LEFT JOIN users opDest ON opDest.id = w.destination_operator_user_id
              LEFT JOIN seals sl ON sl.fuel_waybill_id = w.id
-             WHERE w.driver_user_id = ? AND w.send_status IN ('ثبت شده', 'ارسال شده', 'تحویل شده')
+             WHERE w.driver_user_id = ? AND w.send_status IN ('ثبت شده', 'ارسال شده')
              ORDER BY w.id DESC"
         );
         $stmt->execute([$driver['id']]);
