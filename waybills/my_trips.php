@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($target['send_status'] !== 'ثبت شده') {
                     set_flash('warning', 'این بارنامه قبلاً شروع شده یا در وضعیت دیگری قرار دارد.');
                 } else {
-                    $upd = db()->prepare("UPDATE fuel_waybills SET send_status = 'ارسال شده', trip_started_at = NOW() WHERE id = ?");
+                    $upd = db()->prepare("UPDATE fuel_waybills SET send_status = 'بارگیری شده', trip_started_at = NOW() WHERE id = ?");
                     $upd->execute([$waybillId]);
                     set_flash('success', 'شروع سفر برای بارنامه «' . $target['waybill_number'] . '» ثبت شد.');
                 }
@@ -60,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $waybills = [];
 $statusClassMap = [
     'ثبت شده'   => 'status-registered',
+    'بارگیری شده' => 'status-sent',
     'ارسال شده' => 'status-sent',
     'تحویل شده' => 'status-delivered',
     'لغو شده'   => 'status-cancelled',
@@ -159,6 +160,10 @@ require __DIR__ . '/../includes/header.php';
                 <span class="iconify" data-icon="solar:flag-bold"></span> پایان سفر
               </button>
             </form>
+          <?php elseif ($w['send_status'] === 'بارگیری شده'): ?>
+            <div class="text-center w-100 text-warning small py-2">
+              <span class="iconify" data-icon="solar:hourglass-bold"></span> منتظر تایید متصدی مبدا برای ارسال
+            </div>
           <?php elseif ($w['send_status'] === 'تحویل شده'): ?>
             <div class="text-center w-100 text-muted small py-2">
               <span class="iconify" data-icon="solar:check-circle-bold"></span> این سفر با موفقیت به پایان رسیده است.
