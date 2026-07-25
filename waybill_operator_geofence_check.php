@@ -292,7 +292,7 @@ if ($operator) {
 
   btnConfirm.addEventListener('click', function () {
     if (!insideGeofence || btnConfirm.disabled) return;
-    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN);
+    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN)+'&myseal=1';
   });
 
   var baseLayers = {
@@ -414,7 +414,7 @@ if ($operator) {
   var btnConfirmDirect = document.getElementById('btnConfirmDirect');
   
   btnConfirmDirect.addEventListener('click', function () {
-    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN);
+    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN)+'&myseal=1';
   });
 })();
 </script>
