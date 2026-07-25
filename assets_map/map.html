@@ -457,6 +457,7 @@
         }
 
         locateBtn.disabled = true;
+        locateBtn.innerHTML = '<img src="line-md--loading-twotone-loop.svg" alt="Loading" style="width: 20px; height: 20px; animation: spin 1s linear infinite;">';
 
         navigator.geolocation.getCurrentPosition(
           function (position) {
@@ -484,14 +485,30 @@
             userMarker.bindPopup("موقعیت فعلی شما").openPopup();
             map.setView([lat, lng], 15);
             locateBtn.disabled = false;
+            locateBtn.innerHTML = '<img src="line-md--my-location.svg" alt="Locate">';
           },
-          function () {
-            alert("دریافت موقعیت مکانی ممکن نشد.");
+          function (error) {
+            let errorMsg = "دریافت موقعیت مکانی ممکن نشد.";
+            
+            switch(error.code) {
+              case error.PERMISSION_DENIED:
+                errorMsg = "اجازه دسترسی به موقعیت مکانی رد شد. لطفاً تنظیمات مرورگر را بررسی کنید.";
+                break;
+              case error.POSITION_UNAVAILABLE:
+                errorMsg = "اطلاعات موقعیت مکانی در دسترس نیست.";
+                break;
+              case error.TIMEOUT:
+                errorMsg = "زمان درخواست موقعیت مکانی منقضی شد. لطفاً دوباره تلاش کنید.";
+                break;
+            }
+            
+            alert(errorMsg);
             locateBtn.disabled = false;
+            locateBtn.innerHTML = '<img src="line-md--my-location.svg" alt="Locate">';
           },
           {
             enableHighAccuracy: true,
-            timeout: 10000,
+            timeout: 15000,
             maximumAge: 0
           }
         );
