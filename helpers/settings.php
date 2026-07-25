@@ -7,9 +7,10 @@
 require_once __DIR__ . '/../config/db.php';
 
 /** کلیدهای شناخته‌شدهٔ تنظیمات (مقدار پیش‌فرض BLE برای فرم تعریف پلمپ) */
-const SETTING_DEFAULT_SERVICE_UUID        = 'default_service_uuid';
-const SETTING_DEFAULT_CHARACTERISTIC_UUID = 'default_characteristic_uuid';
-const SETTING_GEOFENCE_CONTROL_ENABLED     = 'geofence_control_enabled';
+const SETTING_DEFAULT_SERVICE_UUID          = 'default_service_uuid';
+const SETTING_DEFAULT_CHARACTERISTIC_UUID   = 'default_characteristic_uuid';
+const SETTING_GEOFENCE_CONTROL_ENABLED      = 'geofence_control_enabled';
+const SETTING_GEOFENCE_CONTROL_OPERATOR     = 'geofence_control_operator_enabled';
 
 /** دریافت مقدار یک تنظیم؛ در صورت نبود، مقدار پیش‌فرض داده‌شده بازگردانده می‌شود */
 function get_setting(string $key, string $default = ''): string

@@ -16,6 +16,7 @@ $current = get_settings([
     SETTING_DEFAULT_SERVICE_UUID        => '',
     SETTING_DEFAULT_CHARACTERISTIC_UUID => '',
     SETTING_GEOFENCE_CONTROL_ENABLED     => '1',
+    SETTING_GEOFENCE_CONTROL_OPERATOR    => '1',
 ]);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -25,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $current[SETTING_DEFAULT_SERVICE_UUID]        = trim((string)($_POST['default_service_uuid'] ?? ''));
         $current[SETTING_DEFAULT_CHARACTERISTIC_UUID] = trim((string)($_POST['default_characteristic_uuid'] ?? ''));
         $current[SETTING_GEOFENCE_CONTROL_ENABLED]     = isset($_POST['geofence_control_enabled']) ? '1' : '0';
+        $current[SETTING_GEOFENCE_CONTROL_OPERATOR]    = isset($_POST['geofence_control_operator_enabled']) ? '1' : '0';
 
         if (mb_strlen($current[SETTING_DEFAULT_SERVICE_UUID]) > 100) {
             $errors[] = 'Service UUID پیش‌فرض باید حداکثر ۱۰۰ کاراکتر باشد.';
@@ -36,7 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$errors) {
             $ok = set_setting(SETTING_DEFAULT_SERVICE_UUID, $current[SETTING_DEFAULT_SERVICE_UUID])
                 && set_setting(SETTING_DEFAULT_CHARACTERISTIC_UUID, $current[SETTING_DEFAULT_CHARACTERISTIC_UUID])
-                && set_setting(SETTING_GEOFENCE_CONTROL_ENABLED, $current[SETTING_GEOFENCE_CONTROL_ENABLED]);
+                && set_setting(SETTING_GEOFENCE_CONTROL_ENABLED, $current[SETTING_GEOFENCE_CONTROL_ENABLED])
+                && set_setting(SETTING_GEOFENCE_CONTROL_OPERATOR, $current[SETTING_GEOFENCE_CONTROL_OPERATOR]);
 
             if ($ok) {
                 set_flash('success', 'تنظیمات با موفقیت ذخیره شد.');
@@ -84,6 +87,17 @@ require __DIR__ . '/../includes/header.php';
             <label class="form-check-label" for="geofence_control_enabled">
               <span class="fw-bold">کنترل حصار جغرافیایی (جئوفنس) راننده</span>
               <div class="small text-muted d-block">هنگام شروع و پایان سفر، موقعیت مکانی راننده بررسی می‌شود.</div>
+            </label>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <div class="form-check form-switch">
+            <input type="checkbox" class="form-check-input" id="geofence_control_operator_enabled" name="geofence_control_operator_enabled"
+                   <?php if ((int)$current[SETTING_GEOFENCE_CONTROL_OPERATOR] === 1): ?>checked<?php endif; ?>>
+            <label class="form-check-label" for="geofence_control_operator_enabled">
+              <span class="fw-bold">کنترل حصار جغرافیایی (جئوفنس) متصدی</span>
+              <div class="small text-muted d-block">هنگام تایید حضور متصدی در مبدا/مقصد، موقعیت مکانی متصدی بررسی می‌شود.</div>
             </label>
           </div>
         </div>

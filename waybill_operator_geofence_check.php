@@ -16,14 +16,16 @@
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/helpers/functions.php';
 require_once __DIR__ . '/helpers/tokens.php';
+require_once __DIR__ . '/helpers/settings.php';
 
 $token = trim((string)($_GET['token'] ?? ''));
 
-$errors    = [];
-$operator  = null;
-$waybill   = null;
-$role      = '';
-$waybillId = 0;
+$errors              = [];
+$operator            = null;
+$waybill             = null;
+$role                = '';
+$waybillId           = 0;
+$geofenceEnabled     = (int)get_setting(SETTING_GEOFENCE_CONTROL_OPERATOR, '1') === 1;
 
 $resolved = validate_operator_action_token($token);
 if (!$resolved) {
@@ -142,9 +144,13 @@ if ($operator) {
 
   <div class="text-center mb-4">
     <span class="iconify fs-1 text-jade" data-icon="solar:map-point-search-bold"></span>
-    <h1 class="h4 fw-bold mt-2 mb-1">بررسی حصار جغرافیایی — تایید حضور متصدی <?= e($roleLabel) ?></h1>
+    <h1 class="h4 fw-bold mt-2 mb-1"><?php if ($geofenceEnabled): ?>بررسی حصار جغرافیایی — تایید حضور متصدی <?= e($roleLabel) ?><?php else: ?>تایید حضور متصدی <?= e($roleLabel) ?><?php endif; ?></h1>
     <p class="text-muted small mb-0">
-      موقعیت فعلی شما گرفته می‌شود و با محدودهٔ مکان <?= e($roleLabel) ?> مقایسه می‌گردد.
+      <?php if ($geofenceEnabled): ?>
+        موقعیت فعلی شما گرفته می‌شود و با محدودهٔ مکان <?= e($roleLabel) ?> مقایسه می‌گردد.
+      <?php else: ?>
+        برای تایید حضور خود آماده هستید.
+      <?php endif; ?>
     </p>
   </div>
 
@@ -189,6 +195,7 @@ if ($operator) {
     </div>
 
     <div class="row g-4">
+      <?php if ($geofenceEnabled): ?>
       <div class="col-lg-8">
         <div class="card panel-card">
           <div class="card-body p-2">
@@ -219,6 +226,34 @@ if ($operator) {
           </div>
         </div>
       </div>
+      <?php else: ?>
+      <div class="col-lg-8">
+        <div class="card panel-card">
+          <div class="card-body p-4 text-center">
+            <span class="iconify fs-1 text-success mb-3 d-block" data-icon="solar:check-circle-bold"></span>
+            <h5 class="fw-bold mb-2">کنترل جئوفنس غیرفعال است</h5>
+            <p class="text-muted mb-0">می‌توانید بدون بررسی موقعیت مکانی، تایید حضور خود را انجام دهید.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card panel-card">
+          <div class="card-body d-flex flex-column gap-3">
+            <button id="btnConfirmDirect" type="button"
+                    class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
+              <span class="iconify" data-icon="solar:check-circle-bold"></span> <?= e($actionButton) ?>
+            </button>
+
+            <div class="text-center">
+              <a href="<?= e($backUrl) ?>" class="small text-muted">
+                انصراف و بازگشت به فهرست بارنامه‌ها
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <?php endif; ?>
     </div>
 
   <?php endif; ?>
@@ -227,8 +262,10 @@ if ($operator) {
 
 <script>
   window.MAPIR_API_KEY = <?= json_encode(MAPIR_API_KEY) ?>;
+  window.GEOFENCE_ENABLED = <?= json_encode($geofenceEnabled) ?>;
 </script>
 <?php if (!$errors): ?>
+<?php if ($geofenceEnabled): ?>
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function () {
@@ -368,6 +405,20 @@ if ($operator) {
   locate();
 })();
 </script>
+<?php else: ?>
+<script>
+(function () {
+  var LOADING_PAGE_URL = '<?= BASE_URL ?>/waybill_operator_loading.php';
+  var TOKEN = <?= json_encode($token) ?>;
+  
+  var btnConfirmDirect = document.getElementById('btnConfirmDirect');
+  
+  btnConfirmDirect.addEventListener('click', function () {
+    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN);
+  });
+})();
+</script>
+<?php endif; ?>
 <?php endif; ?>
 </body>
 </html>
