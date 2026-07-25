@@ -79,8 +79,13 @@ try {
     }
 
     // تغییر وضعیت
-    $upd = db()->prepare("UPDATE fuel_waybills SET send_status = 'ارسال شده', origin_operator_approved_at = NOW() WHERE id = ?");
-    $upd->execute([$waybillId]);
+    update_waybill_status_with_log(
+        (int)$waybillId,
+        'ارسال شده',
+        'api/operator_approve_loading.php: تایید بارگیری متصدی مبدا',
+        (int)$operator['id'],
+        ['origin_operator_approved_at = NOW()']
+    );
 
     json_response(200, true, 'بارنامه با موفقیت برای ارسال تایید شد.');
 } catch (PDOException $e) {

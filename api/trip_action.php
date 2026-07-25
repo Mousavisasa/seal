@@ -76,8 +76,13 @@ try {
         if ($waybill['send_status'] !== 'ثبت شده') {
             json_response(409, false, 'این بارنامه قبلاً شروع شده یا در وضعیت دیگری قرار دارد.');
         }
-        $upd = db()->prepare("UPDATE fuel_waybills SET send_status = 'بارگیری شده', trip_started_at = NOW() WHERE id = ?");
-        $upd->execute([$waybillId]);
+        update_waybill_status_with_log(
+            (int)$waybillId,
+            'بارگیری شده',
+            'api/trip_action.php: سرویس شروع سفر',
+            (int)$driver['id'],
+            ['trip_started_at = NOW()']
+        );
         json_response(200, true, 'سفر با موفقیت شروع شد. منتظر تایید متصدی مبدا برای ارسال بارنامه باشید.');
     }
 
@@ -85,8 +90,13 @@ try {
     if ($waybill['send_status'] !== 'ارسال شده') {
         json_response(409, false, 'این بارنامه هنوز شروع نشده یا قبلاً تحویل داده شده است.');
     }
-    $upd = db()->prepare("UPDATE fuel_waybills SET send_status = 'پایان پیمایش', trip_ended_at = NOW() WHERE id = ?");
-    $upd->execute([$waybillId]);
+    update_waybill_status_with_log(
+        (int)$waybillId,
+        'پایان پیمایش',
+        'api/trip_action.php: سرویس پایان سفر',
+        (int)$driver['id'],
+        ['trip_ended_at = NOW()']
+    );
 
     json_response(200, true, 'سفر با موفقیت به پایان رسید. منتظر تایید متصدی مقصد برای تحویل بارنامه باشید.');
 } catch (PDOException $e) {

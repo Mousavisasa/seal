@@ -198,6 +198,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         (int)($_SESSION['user_id'] ?? 0),
                     ]);
                     $newWaybillId = (int)db()->lastInsertId();
+                    log_waybill_status_change(
+                        $newWaybillId,
+                        null,
+                        'ثبت شده',
+                        'waybills/create.php: فرم ایجاد بارنامه',
+                        (int)($_SESSION['user_id'] ?? 0)
+                    );
 
                     if ($canAttachSeal && $old['seal_id'] !== '') {
                         $sealStmt = db()->prepare('SELECT * FROM seals WHERE id = ? LIMIT 1');

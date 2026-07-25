@@ -139,3 +139,107 @@ function product_color(string $productType): string
 {
     return PRODUCT_COLORS[$productType] ?? '#c7ccd1';
 }
+
+/**
+ * ایجاد جدول لاگ وضعیت بارنامه (برای نصب‌های قدیمی که این جدول را ندارند)
+ */
+function ensure_waybill_status_logs_table(): void
+{
+    static $ensured = false;
+    if ($ensured) {
+        return;
+    }
+
+    db()->exec(
+        "CREATE TABLE IF NOT EXISTS `waybill_status_logs` (
+            `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `fuel_waybill_id` INT UNSIGNED NOT NULL,
+            `from_status` VARCHAR(50) NULL DEFAULT NULL,
+            `to_status` VARCHAR(50) NOT NULL,
+            `source_section` VARCHAR(150) NOT NULL,
+            `performed_by` INT UNSIGNED NULL DEFAULT NULL,
+            `changed_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_waybill_status_logs_waybill` (`fuel_waybill_id`),
+            KEY `idx_waybill_status_logs_changed_at` (`changed_at`),
+            KEY `idx_waybill_status_logs_performed_by` (`performed_by`),
+            CONSTRAINT `fk_waybill_status_logs_waybill` FOREIGN KEY (`fuel_waybill_id`) REFERENCES `fuel_waybills` (`id`)
+                ON UPDATE CASCADE ON DELETE CASCADE,
+            CONSTRAINT `fk_waybill_status_logs_performed_by` FOREIGN KEY (`performed_by`) REFERENCES `users` (`id`)
+                ON UPDATE CASCADE ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+
+    $ensured = true;
+}
+
+/**
+ * ثبت لاگ تغییر وضعیت بارنامه
+ */
+function log_waybill_status_change(
+    int $waybillId,
+    ?string $fromStatus,
+    string $toStatus,
+    string $sourceSection,
+    ?int $performedBy = null,
+    ?PDO $pdo = null
+): void {
+    $sourceSection = trim($sourceSection);
+    if ($sourceSection === '') {
+        throw new InvalidArgumentException('sourceSection نمی‌تواند خالی باشد.');
+    }
+
+    ensure_waybill_status_logs_table();
+    $conn = $pdo ?: db();
+    $stmt = $conn->prepare(
+        'INSERT INTO waybill_status_logs (fuel_waybill_id, from_status, to_status, source_section, performed_by)
+         VALUES (?, ?, ?, ?, ?)'
+    );
+    $stmt->execute([
+        $waybillId,
+        $fromStatus,
+        $toStatus,
+        $sourceSection,
+        $performedBy !== null ? (int)$performedBy : null,
+    ]);
+}
+
+/**
+ * تغییر وضعیت بارنامه به‌همراه ثبت لاگ (اتمیک)
+ */
+function update_waybill_status_with_log(
+    int $waybillId,
+    string $toStatus,
+    string $sourceSection,
+    ?int $performedBy = null,
+    array $extraAssignments = []
+): void {
+    ensure_waybill_status_logs_table();
+    $pdo = db();
+    $pdo->beginTransaction();
+
+    try {
+        $stmt = $pdo->prepare('SELECT send_status FROM fuel_waybills WHERE id = ? LIMIT 1 FOR UPDATE');
+        $stmt->execute([$waybillId]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            throw new RuntimeException('بارنامه مورد نظر یافت نشد.');
+        }
+
+        $fromStatus = $row['send_status'];
+        $setParts = array_merge(['send_status = ?'], $extraAssignments);
+        $sql = 'UPDATE fuel_waybills SET ' . implode(', ', $setParts) . ' WHERE id = ?';
+        $params = [$toStatus, $waybillId];
+
+        $upd = $pdo->prepare($sql);
+        $upd->execute($params);
+
+        log_waybill_status_change($waybillId, $fromStatus, $toStatus, $sourceSection, $performedBy, $pdo);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
+    }
+}

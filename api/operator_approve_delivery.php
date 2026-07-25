@@ -79,8 +79,13 @@ try {
     }
 
     // تغییر وضعیت
-    $upd = db()->prepare("UPDATE fuel_waybills SET send_status = 'تحویل شده', destination_operator_delivered_at = NOW() WHERE id = ?");
-    $upd->execute([$waybillId]);
+    update_waybill_status_with_log(
+        (int)$waybillId,
+        'تحویل شده',
+        'api/operator_approve_delivery.php: تایید تحویل متصدی مقصد',
+        (int)$operator['id'],
+        ['destination_operator_delivered_at = NOW()']
+    );
 
     json_response(200, true, 'بارنامه با موفقیت به عنوان تحویل‌شده ثبت شد.');
 } catch (PDOException $e) {

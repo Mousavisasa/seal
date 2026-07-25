@@ -34,16 +34,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($target['send_status'] !== 'ثبت شده') {
                     set_flash('warning', 'این بارنامه قبلاً شروع شده یا در وضعیت دیگری قرار دارد.');
                 } else {
-                    $upd = db()->prepare("UPDATE fuel_waybills SET send_status = 'بارگیری شده', trip_started_at = NOW() WHERE id = ?");
-                    $upd->execute([$waybillId]);
+                    update_waybill_status_with_log(
+                        (int)$waybillId,
+                        'بارگیری شده',
+                        'waybills/my_trips.php: فرم شروع سفر',
+                        (int)($_SESSION['user_id'] ?? 0),
+                        ['trip_started_at = NOW()']
+                    );
                     set_flash('success', 'شروع سفر برای بارنامه «' . $target['waybill_number'] . '» ثبت شد.');
                 }
             } elseif ($action === 'end_trip') {
                 if ($target['send_status'] !== 'ارسال شده') {
                     set_flash('warning', 'این بارنامه هنوز شروع نشده یا قبلاً تحویل داده شده است.');
                 } else {
-                    $upd = db()->prepare("UPDATE fuel_waybills SET send_status = 'تحویل شده', trip_ended_at = NOW() WHERE id = ?");
-                    $upd->execute([$waybillId]);
+                    update_waybill_status_with_log(
+                        (int)$waybillId,
+                        'تحویل شده',
+                        'waybills/my_trips.php: فرم پایان سفر',
+                        (int)($_SESSION['user_id'] ?? 0),
+                        ['trip_ended_at = NOW()']
+                    );
                     set_flash('success', 'پایان سفر برای بارنامه «' . $target['waybill_number'] . '» ثبت شد.');
                 }
             }

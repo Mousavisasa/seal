@@ -124,6 +124,26 @@ CREATE TABLE IF NOT EXISTS `fuel_waybills` (
   CONSTRAINT `chk_waybill_distance_positive` CHECK (`distance_km` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ---------- جدول لاگ تغییر وضعیت بارنامه ----------
+-- هر تغییر وضعیت بارنامه (از هر فرم/سرویس) یک رکورد اینجا ثبت می‌کند
+CREATE TABLE IF NOT EXISTS `waybill_status_logs` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `fuel_waybill_id` INT UNSIGNED NOT NULL,
+  `from_status` VARCHAR(50) NULL DEFAULT NULL,
+  `to_status` VARCHAR(50) NOT NULL,
+  `source_section` VARCHAR(150) NOT NULL,
+  `performed_by` INT UNSIGNED NULL DEFAULT NULL,
+  `changed_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_waybill_status_logs_waybill` (`fuel_waybill_id`),
+  KEY `idx_waybill_status_logs_changed_at` (`changed_at`),
+  KEY `idx_waybill_status_logs_performed_by` (`performed_by`),
+  CONSTRAINT `fk_waybill_status_logs_waybill` FOREIGN KEY (`fuel_waybill_id`) REFERENCES `fuel_waybills` (`id`)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT `fk_waybill_status_logs_performed_by` FOREIGN KEY (`performed_by`) REFERENCES `users` (`id`)
+    ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- =====================================================
 -- ماژول انبارداری پلمپ: تعریف پلمپ، تخصیص به منطقه، الصاق به بارنامه
 -- =====================================================
@@ -309,5 +329,23 @@ INSERT INTO `seals` (`seal_id`, `seal_password`, `seal_status`, `region_id`, `cr
 --   PRIMARY KEY (`id`),
 --   UNIQUE KEY `uk_app_settings_key` (`setting_key`)
 -- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
+--
+-- 9) افزودن لاگ تغییر وضعیت بارنامه:
+-- CREATE TABLE IF NOT EXISTS `waybill_status_logs` (
+--   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+--   `fuel_waybill_id` INT UNSIGNED NOT NULL,
+--   `from_status` VARCHAR(50) NULL DEFAULT NULL,
+--   `to_status` VARCHAR(50) NOT NULL,
+--   `source_section` VARCHAR(150) NOT NULL,
+--   `performed_by` INT UNSIGNED NULL DEFAULT NULL,
+--   `changed_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+--   PRIMARY KEY (`id`),
+--   KEY `idx_waybill_status_logs_waybill` (`fuel_waybill_id`),
+--   KEY `idx_waybill_status_logs_changed_at` (`changed_at`),
+--   KEY `idx_waybill_status_logs_performed_by` (`performed_by`),
+--   CONSTRAINT `fk_waybill_status_logs_waybill` FOREIGN KEY (`fuel_waybill_id`) REFERENCES `fuel_waybills` (`id`)
+--     ON UPDATE CASCADE ON DELETE CASCADE,
+--   CONSTRAINT `fk_waybill_status_logs_performed_by` FOREIGN KEY (`performed_by`) REFERENCES `users` (`id`)
+--     ON UPDATE CASCADE ON DELETE SET NULL
+-- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
