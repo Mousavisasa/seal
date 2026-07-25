@@ -106,7 +106,7 @@ if ($driver) {
              LEFT JOIN users opOrig ON opOrig.id = w.origin_operator_user_id
              LEFT JOIN users opDest ON opDest.id = w.destination_operator_user_id
              LEFT JOIN seals sl ON sl.fuel_waybill_id = w.id
-             WHERE w.driver_user_id = ? AND w.send_status IN ('ثبت شده', 'ارسال شده')
+             WHERE w.driver_user_id = ? AND w.send_status IN ('ثبت شده', 'ارسال شده', 'بارگیری شده')
              ORDER BY w.id DESC"
         );
         $stmt->execute([$driver['id']]);
@@ -119,7 +119,9 @@ if ($driver) {
 
 $statusClassMap = [
     'ثبت شده'   => 'status-registered',
+    'بارگیری شده' => 'status-loading',
     'ارسال شده' => 'status-sent',
+    'پایان پیمایش' => 'status-completed',
     'تحویل شده' => 'status-delivered',
 ];
 ?>
@@ -256,14 +258,22 @@ $statusClassMap = [
                                          class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
                                           <span class="iconify" data-icon="solar:play-circle-bold"></span> شروع سفر
                                       </a>
+                                  <?php elseif ($w['send_status'] === 'بارگیری شده'): ?>
+                                      <div class="text-center w-100 text-warning small py-2">
+                                          <span class="iconify" data-icon="solar:hourglass-bold"></span> منتظر تایید متصدی مبدا برای ارسال
+                                      </div>
                                   <?php elseif ($w['send_status'] === 'ارسال شده'): ?>
                                       <?php $tripToken = create_trip_action_token((int)$driver['id'], 'end', (int)$w['id']); ?>
                                       <a href="<?= BASE_URL ?>/waybill_geofence_check.php?token=<?= e(rawurlencode($tripToken)) ?>"
                                          class="btn btn-soft-purple w-100 d-flex align-items-center justify-content-center gap-2">
                                           <span class="iconify" data-icon="solar:flag-bold"></span> پایان سفر
                                       </a>
+                                  <?php elseif ($w['send_status'] === 'پایان پیمایش'): ?>
+                                      <div class="text-center w-100 text-info small py-2">
+                                          <span class="iconify" data-icon="solar:hourglass-bold"></span> منتظر تایید متصدی مقصد برای تحویل
+                                      </div>
                                   <?php elseif ($w['send_status'] === 'تحویل شده'): ?>
-                                      <div class="text-center w-100 text-muted small py-2">
+                                      <div class="text-center w-100 text-success small py-2">
                                           <span class="iconify" data-icon="solar:check-circle-bold"></span> این سفر با موفقیت به پایان رسیده است.
                                       </div>
                                   <?php else: ?>
