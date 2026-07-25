@@ -9,10 +9,11 @@
  * ۲) با فرم کد ملی/رمز عبور: بعد از احراز هویت موفق، یک توکن تازه ساخته می‌شود
  *    و کاربر به همان صفحه با آدرس ?token=... هدایت می‌شود (redirect).
  *
- * برای هر بارنامه، اگر متصدی هنوز حضور خود را در نقشی که دارد (مبدا/مقصد)
- * تایید نکرده، دکمهٔ «تایید حضور» نمایش داده می‌شود که او را با یک توکن
- * یک‌بارمصرف مخصوص همان عملیات (helpers/tokens.php::create_operator_action_token)
- * به waybill_operator_geofence_check.php می‌فرستد.
+ * برای هر بارنامه، اگر نوبت تایید بارگیری/تحویل رسیده باشد، همان‌جا دکمهٔ
+ * ثبت وضعیت نمایش داده می‌شود؛ و برای مراحل حضور، دکمهٔ «تایید حضور» کاربر
+ * را با یک توکن یک‌بارمصرف مخصوص همان عملیات
+ * (helpers/tokens.php::create_operator_action_token) به
+ * waybill_operator_geofence_check.php می‌فرستد.
  */
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/helpers/functions.php';
@@ -109,7 +110,9 @@ if ($operator) {
 
 $statusClassMap = [
     'ثبت شده'   => 'status-registered',
+    'بارگیری شده' => 'status-loading',
     'ارسال شده' => 'status-sent',
+    'پایان پیمایش' => 'status-completed',
     'تحویل شده' => 'status-delivered',
 ];
 ?>
@@ -124,6 +127,12 @@ $statusClassMap = [
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
 <script src="<?= BASE_URL ?>/assets/js/iconify.min.js"></script>
 <script src="<?= BASE_URL ?>/assets/js/iconify-icons.js"></script>
+<style>
+.status-loading { background-color: #ffc107; color: #212529; }
+.status-completed { background-color: #17a2b8; color: #fff; }
+.loading-spinner { display: inline-block; animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>
 </head>
 <body class="public-page-body">
 
@@ -134,7 +143,7 @@ $statusClassMap = [
     <h1 class="h4 fw-bold mt-2 mb-1">بارنامه‌های ایستگاه متصدی</h1>
     <p class="text-muted small mb-0">
       <?php if ($operator): ?>
-        بارنامه‌های تخصیص‌یافته به ایستگاه خود را مشاهده و حضورتان را تایید کنید.
+        بارنامه‌های تخصیص‌یافته به ایستگاه خود را مشاهده و وضعیت/حضور را ثبت کنید.
       <?php else: ?>
         با کد ملی و رمز عبور خود وارد شوید تا بارنامه‌های ایستگاه خود را ببینید.
       <?php endif; ?>
@@ -209,6 +218,19 @@ $statusClassMap = [
                     $role          = $isOrigin ? 'origin' : 'destination';
                     $roleLabel     = $isOrigin ? 'متصدی مبدا' : 'متصدی مقصد';
                     $confirmedAt   = $isOrigin ? ($w['origin_confirmed_at'] ?? null) : ($w['destination_confirmed_at'] ?? null);
+                    $actionApiUrl  = null;
+                    $actionLabel   = null;
+                    $actionMessage = null;
+
+                    if ($isOrigin && $w['send_status'] === 'بارگیری شده') {
+                        $actionApiUrl  = BASE_URL . '/api/operator_approve_loading.php';
+                        $actionLabel   = 'تایید بارگیری';
+                        $actionMessage = 'آیا مطمئن هستید که می‌خواهید این بارنامه را برای ارسال تایید کنید؟';
+                    } elseif (!$isOrigin && $w['send_status'] === 'پایان پیمایش') {
+                        $actionApiUrl  = BASE_URL . '/api/operator_approve_delivery.php';
+                        $actionLabel   = 'تایید تحویل';
+                        $actionMessage = 'آیا مطمئن هستید که می‌خواهید این بارنامه را به عنوان تحویل‌شده ثبت کنید؟';
+                    }
                   ?>
                   <div class="col-md-6 col-xl-4">
                       <div class="card panel-card h-100">
@@ -243,7 +265,15 @@ $statusClassMap = [
                               </div>
 
                               <div class="mt-auto pt-2 d-flex gap-2">
-                                  <?php if ($confirmedAt): ?>
+                                  <?php if ($actionApiUrl): ?>
+                                      <button type="button"
+                                              class="btn btn-success w-100 d-flex align-items-center justify-content-center gap-2 operator-status-btn"
+                                              data-api-url="<?= e($actionApiUrl) ?>"
+                                              data-waybill-id="<?= e((string)$w['id']) ?>"
+                                              data-confirm-message="<?= e($actionMessage) ?>">
+                                          <span class="iconify" data-icon="solar:check-circle-bold"></span> <?= e($actionLabel) ?>
+                                      </button>
+                                  <?php elseif ($confirmedAt): ?>
                                       <div class="text-center w-100 text-muted small py-2">
                                           <span class="iconify" data-icon="solar:check-circle-bold"></span> حضور شما در این بارنامه تایید شده است.
                                       </div>
@@ -291,6 +321,54 @@ document.querySelectorAll('.toggle-pass').forEach(function (btn) {
     input.type = isPass ? 'text' : 'password';
     var icon = btn.querySelector('.iconify');
     if (icon) icon.setAttribute('data-icon', isPass ? 'solar:eye-closed-bold' : 'solar:eye-bold');
+  });
+});
+
+document.querySelectorAll('.operator-status-btn').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var apiUrl = btn.getAttribute('data-api-url');
+    var waybillId = parseInt(btn.getAttribute('data-waybill-id') || '0', 10);
+    var confirmMessage = btn.getAttribute('data-confirm-message') || 'آیا مطمئن هستید؟';
+
+    if (!apiUrl || !waybillId) {
+      return;
+    }
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    var originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading-spinner iconify" data-icon="solar:refresh-bold"></span> درحال‌پردازش...';
+
+    fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        token: <?= json_encode($token) ?>,
+        waybill_id: waybillId
+      })
+    })
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        if (data.success) {
+          alert(data.message || 'عملیات با موفقیت انجام شد.');
+          location.reload();
+          return;
+        }
+
+        alert('خطا: ' + (data.message || 'عملیات ناموفق بود.'));
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      })
+      .catch(function (err) {
+        alert('خطایی رخ داد: ' + err.message);
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      });
   });
 });
 </script>

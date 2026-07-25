@@ -120,7 +120,7 @@ if ($driver) {
 $statusClassMap = [
     'ثبت شده'   => 'status-registered',
     'بارگیری شده' => 'status-loading',
-    'ارسال شده' => 'status-sent',
+    'ارسال شده' => 'status-s ent',
     'پایان پیمایش' => 'status-completed',
     'تحویل شده' => 'status-delivered',
 ];
