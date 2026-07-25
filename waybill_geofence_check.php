@@ -290,6 +290,7 @@ if ($driver) {
   var CHECK_URL = '<?= BASE_URL ?>/map/geofence/check.php';
   var LOADING_PAGE_URL = '<?= BASE_URL ?>/waybill_trip_loading.php';
   var TOKEN = <?= json_encode($token) ?>; // همان توکن یک‌بارمصرفِ عملیات؛ تنها ورودی صفحهٔ لودینگ/وب‌سرویس
+  var WAYBILL = <?= $waybillId ?>;
 
   var resultDiv      = document.getElementById('result');
   var btnConfirm      = document.getElementById('btnConfirm');
@@ -308,7 +309,7 @@ if ($driver) {
   // وب‌سرویس api/trip_action.php درخواست می‌زند.
   btnConfirm.addEventListener('click', function () {
     if (!insideGeofence || btnConfirm.disabled) return;
-    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN);
+    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN)+'&'+WAYBILL;
   });
 
   // همان لایه‌های پایه و مقداردهی نقشه که در map/index.php استفاده شده
