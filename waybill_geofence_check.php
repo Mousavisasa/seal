@@ -437,11 +437,12 @@ if ($driver) {
 (function () {
   var LOADING_PAGE_URL = '<?= BASE_URL ?>/waybill_trip_loading.php';
   var TOKEN = <?= json_encode($token) ?>;
+  var WAYBILL = <?= $waybillId ?>;
 
   var btnConfirmDirect = document.getElementById('btnConfirmDirect');
   
   btnConfirmDirect.addEventListener('click', function () {
-    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN);
+    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN)+'&'+WAYBILL;;
   });
 })();
 </script>
