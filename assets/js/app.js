@@ -534,6 +534,130 @@
   }
 })();
 
+/* ---------- صفحه تست وب‌سرویس پلمپ بر اساس شماره بارنامه ---------- */
+(function () {
+  'use strict';
+  var sealSendBtn = document.getElementById('sealSendBtn');
+  var sealApiUrl = window.API_SEAL_BY_WAYBILL_URL;
+  var mintDriverTokenUrl = window.API_TEST_DRIVER_TOKEN_URL;
+
+  // نمایش آدرس و نمونه‌کدهای مستندات با آدرس واقعی سرور (صرف‌نظر از اینکه
+  // راننده‌ای برای تست زنده موجود باشد یا نه، همیشه اجرا می‌شود)
+  var sealEndpointText = document.getElementById('sealEndpointText');
+  if (sealEndpointText && sealApiUrl) sealEndpointText.textContent = 'GET ' + sealApiUrl + '?token=...&waybill_number=...';
+
+  var sealCurlSample = document.getElementById('sealCurlSample');
+  if (sealCurlSample && sealApiUrl) sealCurlSample.textContent =
+    'curl -X GET "' + sealApiUrl + '?token=<TOKEN>&waybill_number=<WAYBILL_NUMBER>"';
+
+  var sealJsSample = document.getElementById('sealJsSample');
+  if (sealJsSample && sealApiUrl) sealJsSample.textContent =
+    'const url = new URL("' + sealApiUrl + '");\n' +
+    'url.searchParams.set("token", token);\n' +
+    'url.searchParams.set("waybill_number", waybillNumber);\n' +
+    'const res = await fetch(url);\n' +
+    'const data = await res.json();\n' +
+    'if (data.success) {\n' +
+    '  console.log("اطلاعات پلمپ:", data.seal);\n' +
+    '} else {\n' +
+    '  console.log("خطا:", data.message);\n' +
+    '}';
+
+  var sealPhpSample = document.getElementById('sealPhpSample');
+  if (sealPhpSample && sealApiUrl) sealPhpSample.textContent =
+    '$url = "' + sealApiUrl + '?token=" . urlencode($token) . "&waybill_number=" . urlencode($waybillNumber);\n' +
+    '$ch = curl_init($url);\n' +
+    'curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);\n' +
+    '$response = curl_exec($ch);\n' +
+    '$status   = curl_getinfo($ch, CURLINFO_HTTP_CODE);\n' +
+    'curl_close($ch);\n' +
+    '$data = json_decode($response, true);';
+
+  if (!sealSendBtn) return; // راننده فعالی برای تست زنده وجود ندارد یا در این زیرصفحه نیستیم
+
+  var sealDriverSelect = document.getElementById('sealDriverSelect');
+  var sealWaybillNumberInput = document.getElementById('sealWaybillNumberInput');
+  var sealClearBtn = document.getElementById('sealClearBtn');
+  var sealResultBox = document.getElementById('sealResultBox');
+  var sealTokenText = document.getElementById('sealTokenText');
+  var sealStatusBadge = document.getElementById('sealStatusBadge');
+  var sealTimeBadge = document.getElementById('sealTimeBadge');
+  var sealResponseEl = document.getElementById('sealResponse');
+
+  function showSealResult(status, body, ms, isNetworkError) {
+    if (!sealResultBox || !sealStatusBadge || !sealTimeBadge || !sealResponseEl) return;
+    sealResultBox.classList.remove('d-none');
+    sealStatusBadge.className = 'badge rounded-pill ' +
+      (isNetworkError ? 'badge-status-err'
+        : status >= 200 && status < 300 ? 'badge-status-ok'
+        : status >= 400 && status < 500 ? 'badge-status-warn'
+        : 'badge-status-err');
+    sealStatusBadge.textContent = isNetworkError ? 'خطای اتصال' : ('HTTP ' + status);
+    sealTimeBadge.textContent = 'زمان پاسخ: ' + ms + ' میلی‌ثانیه';
+    sealResponseEl.textContent = body;
+  }
+
+  sealSendBtn.addEventListener('click', function () {
+    var driverId = sealDriverSelect ? sealDriverSelect.value : '';
+    var waybillNumber = sealWaybillNumberInput ? sealWaybillNumberInput.value.trim() : '';
+    if (!driverId || !waybillNumber) return;
+
+    sealSendBtn.disabled = true;
+    if (sealTokenText) sealTokenText.textContent = 'در حال ساخت توکن…';
+    var start = (window.performance && performance.now) ? performance.now() : Date.now();
+
+    fetch(mintDriverTokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'driver_id=' + encodeURIComponent(driverId)
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (mintData) {
+        if (!mintData.success) {
+          if (sealTokenText) sealTokenText.textContent = '—';
+          var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+          showSealResult(0, 'خطا در ساخت توکن آزمایشی: ' + mintData.message, elapsed, true);
+          sealSendBtn.disabled = false;
+          return;
+        }
+
+        if (sealTokenText) sealTokenText.textContent = mintData.token;
+
+        var url = sealApiUrl + '?token=' + encodeURIComponent(mintData.token) +
+          '&waybill_number=' + encodeURIComponent(waybillNumber);
+
+        fetch(url)
+          .then(function (res) {
+            return res.text().then(function (text) {
+              var pretty = text;
+              try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch (e) {}
+              var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+              showSealResult(res.status, pretty, elapsed, false);
+              sealSendBtn.disabled = false;
+            });
+          })
+          .catch(function (err) {
+            var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+            showSealResult(0, 'اتصال به سرور برقرار نشد.\n\n' + (err && err.message ? err.message : ''), elapsed, true);
+            sealSendBtn.disabled = false;
+          });
+      })
+      .catch(function (err) {
+        var elapsed = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - start);
+        showSealResult(0, 'اتصال به سرور برقرار نشد.\n\n' + (err && err.message ? err.message : ''), elapsed, true);
+        sealSendBtn.disabled = false;
+      });
+  });
+
+  if (sealClearBtn) {
+    sealClearBtn.addEventListener('click', function () {
+      if (sealResultBox) sealResultBox.classList.add('d-none');
+      if (sealResponseEl) sealResponseEl.textContent = '';
+      if (sealTokenText) sealTokenText.textContent = '';
+    });
+  }
+})();
+
 /* ---------- صفحه مستندات وب‌سرویس حصار جغرافیایی (متصدی) ---------- */
 (function () {
   'use strict';

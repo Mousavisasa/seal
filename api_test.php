@@ -5,6 +5,7 @@
  *  ۱) وب‌سرویس ورود (api/login.php)
  *  ۲) وب‌سرویس شروع/پایان سفر (api/trip_action.php)
  *  ۳) وب‌سرویس بارنامه ی انتخاب شده (api/active_waybill.php)
+ *  ۴) وب‌سرویس پلمپ بر اساس شماره بارنامه (api/seal_by_waybill.php)
  */
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/helpers/auth.php';
@@ -49,6 +50,33 @@ try {
     )->fetchAll();
 } catch (PDOException $e) {
     error_log('api_test active drivers fetch error: ' . $e->getMessage());
+}
+
+// بارنامه‌هایی که پلمپ به آن‌ها متصل شده — برای تست زنده وب‌سرویس دریافت پلمپ بر اساس شماره بارنامه
+$waybillsWithSeal = [];
+try {
+    $waybillsWithSeal = db()->query(
+        "SELECT w.waybill_number, s.seal_id
+         FROM fuel_waybills w
+         INNER JOIN seals s ON s.fuel_waybill_id = w.id
+         ORDER BY w.id DESC"
+    )->fetchAll();
+} catch (PDOException $e) {
+    error_log('api_test waybills with seal fetch error: ' . $e->getMessage());
+}
+
+// رانندگان فعال — برای ساخت توکن آزمایشی در تست وب‌سرویس دریافت پلمپ بر اساس شماره بارنامه
+// (این وب‌سرویس هر توکن معتبر راننده را می‌پذیرد و مالکیت بارنامه را بررسی نمی‌کند)
+$allActiveDrivers = [];
+try {
+    $allActiveDrivers = db()->query(
+        "SELECT id, first_name, last_name, national_code
+         FROM users
+         WHERE user_type = 'driver' AND is_active = 1
+         ORDER BY id DESC"
+    )->fetchAll();
+} catch (PDOException $e) {
+    error_log('api_test active drivers list fetch error: ' . $e->getMessage());
 }
 
 // بارنامه‌هایی که یک متصدی (مبدا یا مقصد) دارند و هنوز حضورش تایید نشده — برای
@@ -105,7 +133,7 @@ $serviceParam = (string)($_GET['service'] ?? '');
 if ($role === 'operator') {
     $service = in_array($serviceParam, ['webview', 'geofence', 'trip_action', 'active_waybill'], true) ? $serviceParam : 'login';
 } else {
-    $service = in_array($serviceParam, ['trip', 'active'], true) ? $serviceParam : 'login';
+    $service = in_array($serviceParam, ['trip', 'active', 'seal'], true) ? $serviceParam : 'login';
 }
 
 // اپراتورهای واقعی برای اطلاع‌رسانی در مستندات (اولین کاربر operator فعال، برای نمونه آدرس‌دهی)
@@ -160,6 +188,11 @@ require __DIR__ . '/includes/header.php';
   <li class="nav-item">
     <a href="?role=driver&service=active" class="nav-link <?= $service === 'active' ? 'active' : '' ?>">
       <span class="iconify" data-icon="solar:document-text-bold"></span> وب‌سرویس بارنامه ی انتخاب شده
+    </a>
+  </li>
+  <li class="nav-item">
+    <a href="?role=driver&service=seal" class="nav-link <?= $service === 'seal' ? 'active' : '' ?>">
+      <span class="iconify" data-icon="solar:lock-keyhole-bold"></span> وب‌سرویس پلمپ بر اساس بارنامه
     </a>
   </li>
 </ul>
@@ -933,6 +966,264 @@ require __DIR__ . '/includes/header.php';
     </div>
   </div>
 </div>
+
+<!-- ================================================================= -->
+<!-- ================= ۴) وب‌سرویس پلمپ بر اساس بارنامه ================= -->
+<!-- ================================================================= -->
+<div class="api-service-panel <?= $service === 'seal' ? '' : 'd-none' ?>" data-panel="seal">
+
+  <!-- ================= تست زنده ================= -->
+  <div class="card panel-card mb-4">
+    <div class="card-header d-flex align-items-center gap-2">
+      <span class="iconify text-jade fs-5" data-icon="solar:test-tube-bold"></span>
+      <span class="fw-bold">تست زنده اتصال</span>
+    </div>
+    <div class="card-body p-4">
+
+      <?php if (!$allActiveDrivers): ?>
+        <div class="text-muted small">
+          در حال حاضر هیچ راننده فعالی در سیستم وجود ندارد. برای تست این وب‌سرویس ابتدا باید
+          حداقل یک راننده فعال ثبت شده باشد.
+        </div>
+      <?php else: ?>
+        <div class="row g-3 align-items-end">
+          <div class="col-md-6">
+            <label class="form-label" for="sealDriverSelect">راننده برای ساخت توکن آزمایشی</label>
+            <select class="form-select" id="sealDriverSelect">
+              <?php foreach ($allActiveDrivers as $d): ?>
+                <option value="<?= e((string)$d['id']) ?>">
+                  راننده <?= e($d['first_name'] . ' ' . $d['last_name']) ?> (<?= e($d['national_code']) ?>)
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="sealWaybillNumberInput">شماره بارنامه</label>
+            <?php if ($waybillsWithSeal): ?>
+              <input type="text" class="form-control ltr-text" id="sealWaybillNumberInput"
+                     list="sealWaybillNumberList" placeholder="مثلاً 5" value="<?= e((string)$waybillsWithSeal[0]['waybill_number']) ?>">
+              <datalist id="sealWaybillNumberList">
+                <?php foreach ($waybillsWithSeal as $w): ?>
+                  <option value="<?= e((string)$w['waybill_number']) ?>">پلمپ: <?= e((string)$w['seal_id']) ?></option>
+                <?php endforeach; ?>
+              </datalist>
+              <div class="form-text">شماره بارنامه‌هایی که هم‌اکنون پلمپ دارند به‌عنوان پیشنهاد نمایش داده می‌شود.</div>
+            <?php else: ?>
+              <input type="text" class="form-control ltr-text" id="sealWaybillNumberInput" placeholder="مثلاً 5">
+              <div class="form-text text-muted">
+                در حال حاضر هیچ بارنامه‌ای پلمپ متصل ندارد؛ می‌توانید یک شماره بارنامه دلخواه وارد کنید
+                (پاسخ ۴۰۴ «یافت نشد» خواهد بود).
+              </div>
+            <?php endif; ?>
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-4">
+          <button type="button" class="btn btn-primary d-flex align-items-center gap-2" id="sealSendBtn">
+            <span class="iconify fs-5" data-icon="solar:play-circle-bold"></span> دریافت توکن و ارسال درخواست
+          </button>
+          <button type="button" class="btn btn-outline-secondary d-flex align-items-center gap-2" id="sealClearBtn">
+            <span class="iconify" data-icon="solar:eraser-bold"></span> پاک‌کردن نتیجه
+          </button>
+        </div>
+
+        <!-- نتیجه -->
+        <div id="sealResultBox" class="mt-4 d-none">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span class="fw-bold">توکن راننده مورد استفاده:</span>
+            <code class="ltr-code" id="sealTokenText"></code>
+          </div>
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span class="fw-bold">نتیجه:</span>
+            <span class="badge rounded-pill" id="sealStatusBadge"></span>
+            <span class="text-muted small" id="sealTimeBadge"></span>
+          </div>
+          <pre data-lang="json" class="api-response ltr-code mb-0" id="sealResponse"></pre>
+        </div>
+      <?php endif; ?>
+    </div>
+  </div>
+
+  <!-- ================= مستندات ================= -->
+  <div class="card panel-card">
+    <div class="card-header d-flex align-items-center gap-2">
+      <span class="iconify text-purple fs-5" data-icon="solar:book-2-bold"></span>
+      <span class="fw-bold">مستندات وب‌سرویس پلمپ بر اساس شماره بارنامه</span>
+    </div>
+    <div class="card-body p-4">
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:link-circle-bold"></span> آدرس و متد
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <tbody>
+            <tr>
+              <th class="w-25">آدرس (Endpoint)</th>
+              <td><code class="ltr-code" id="sealEndpointText"></code></td>
+            </tr>
+            <tr>
+              <th>متد</th>
+              <td><span class="badge role-badge role-admin">GET</span> یا <span class="badge role-badge role-admin">POST</span> (سایر متدها با کد <code>405</code> رد می‌شوند)</td>
+            </tr>
+            <tr>
+              <th>نوع ورودی</th>
+              <td><code>application/json</code>، <code>form-data</code> یا پارامتر GET</td>
+            </tr>
+            <tr>
+              <th>خروجی</th>
+              <td>همیشه JSON با ساختار ثابت <code class="ltr-code">{ success, message, seal }</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:document-add-bold"></span> پارامترهای ورودی
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr><th>نام</th><th>نوع</th><th>الزامی</th><th>توضیح</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>token</code></td><td>رشته</td><td>بله</td>
+              <td>یک توکن معتبر و فعال <code>driver_waybills</code> (از وب‌سرویس ورود یا صفحه
+                <code>driver_waybills.php</code>)؛ صرفاً هویت راننده را احراز می‌کند و مالکیت بارنامه
+                بررسی نمی‌شود.</td>
+            </tr>
+            <tr>
+              <td><code>waybill_number</code></td><td>رشته</td><td>بله</td>
+              <td>شماره بارنامه‌ای که پلمپ آن مورد نظر است</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:document-text-bold"></span> پارامترهای خروجی
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr><th>نام</th><th>نوع</th><th>همیشه؟</th><th>توضیح</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>success</code></td><td>boolean</td><td>بله</td>
+              <td><code>true</code> در پاسخ موفق، در خطا (شامل «بارنامه/پلمپ یافت نشد») <code>false</code></td>
+            </tr>
+            <tr>
+              <td><code>message</code></td><td>رشته</td><td>بله</td>
+              <td>پیام فارسی نتیجه</td>
+            </tr>
+            <tr>
+              <td><code>seal</code></td><td>شیء</td><td>فقط در موفقیت</td>
+              <td>اطلاعات پلمپ متصل به بارنامه؛ فیلدهای زیر را دارد</td>
+            </tr>
+            <tr>
+              <td><code>seal.id</code></td><td>عدد</td><td>—</td>
+              <td>شناسه یکتای رکورد پلمپ در جدول <code>seals</code></td>
+            </tr>
+            <tr>
+              <td><code>seal.seal_id</code></td><td>رشته</td><td>—</td>
+              <td>شناسه پلمپ</td>
+            </tr>
+            <tr>
+              <td><code>seal.seal_password</code></td><td>رشته</td><td>—</td>
+              <td>رمز/کد پلمپ</td>
+            </tr>
+            <tr>
+              <td><code>seal.service_uuid</code></td><td>رشته یا <code>null</code></td><td>—</td>
+              <td>Service UUID پلمپ (برای ارتباط BLE)</td>
+            </tr>
+            <tr>
+              <td><code>seal.characteristic_uuid</code></td><td>رشته یا <code>null</code></td><td>—</td>
+              <td>Characteristic UUID پلمپ (برای خواندن/نوشتن روی دستگاه)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:server-square-bold"></span> کدهای وضعیت HTTP
+      </h2>
+      <div class="table-responsive mb-4">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr><th>کد</th><th>وضعیت</th><th>توضیح</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="badge role-badge role-driver">200</span></td><td>موفق</td><td>پلمپ متصل به این بارنامه برگردانده شد</td></tr>
+            <tr><td><span class="badge role-badge role-operator">401</span></td><td>عدم احراز</td><td>توکن نامعتبر است یا منقضی شده است</td></tr>
+            <tr><td><span class="badge role-badge role-operator">403</span></td><td>عدم دسترسی</td><td>توکن متعلق به راننده نیست یا حساب غیرفعال است</td></tr>
+            <tr><td><span class="badge role-badge role-region">404</span></td><td>یافت نشد</td><td>بارنامه‌ای با این شماره وجود ندارد یا پلمپی به آن متصل نیست</td></tr>
+            <tr><td><span class="badge role-badge role-region">405</span></td><td>متد غیرمجاز</td><td>فقط GET یا POST پذیرفته می‌شود</td></tr>
+            <tr><td><span class="badge role-badge role-operator">422</span></td><td>ورودی ناقص</td><td>توکن یا شماره بارنامه ارسال نشده است</td></tr>
+            <tr><td><span class="badge role-badge role-admin">500</span></td><td>خطای سرور</td><td>خطای داخلی؛ جزئیات فنی هرگز افشا نمی‌شود</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2">
+        <span class="iconify text-jade" data-icon="solar:check-circle-bold"></span> نمونه پاسخ موفق (200)
+      </h2>
+      <pre data-lang="json" class="api-doc-code ltr-code">{
+  "success": true,
+  "message": "اطلاعات پلمپ با موفقیت دریافت شد.",
+  "seal": {
+    "id": 12,
+    "seal_id": "SL-1042",
+    "seal_password": "AB12CD34",
+    "service_uuid": "0000180a-0000-1000-8000-00805f9b34fb",
+    "characteristic_uuid": "00002a29-0000-1000-8000-00805f9b34fb"
+  }
+}</pre>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2 mt-4">
+        <span class="iconify text-jade" data-icon="solar:close-circle-bold"></span> نمونه پاسخ ناموفق — یافت نشد (404)
+      </h2>
+      <pre data-lang="json" class="api-doc-code ltr-code">{
+  "success": false,
+  "message": "پلمپی برای این بارنامه یافت نشد."
+}</pre>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2 mt-4">
+        <span class="iconify text-jade" data-icon="solar:close-circle-bold"></span> نمونه پاسخ ناموفق — توکن نامعتبر (401)
+      </h2>
+      <pre data-lang="json" class="api-doc-code ltr-code">{
+  "success": false,
+  "message": "توکن نامعتبر است یا منقضی شده است."
+}</pre>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2 mt-4">
+        <span class="iconify text-jade" data-icon="solar:command-bold"></span> نمونه فراخوانی با cURL
+      </h2>
+      <pre data-lang="curl" class="api-doc-code ltr-code" id="sealCurlSample"></pre>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2 mt-4">
+        <span class="iconify text-jade" data-icon="logos:javascript"></span> نمونه فراخوانی با JavaScript (fetch)
+      </h2>
+      <pre data-lang="javascript" class="api-doc-code ltr-code" id="sealJsSample"></pre>
+
+      <h2 class="h6 fw-bold d-flex align-items-center gap-2 mt-4">
+        <span class="iconify text-jade" data-icon="logos:php"></span> نمونه فراخوانی با PHP (cURL)
+      </h2>
+      <pre data-lang="php" class="api-doc-code ltr-code" id="sealPhpSample"></pre>
+
+      <div class="alert alert-info d-flex align-items-start gap-2 mt-4 mb-0">
+        <span class="iconify fs-5 mt-1" data-icon="solar:info-circle-bold"></span>
+        <div>
+          <strong>نکات:</strong> این وب‌سرویس فقط خواندنی است و هیچ داده‌ای را تغییر نمی‌دهد. برخلاف
+          وب‌سرویس بارنامه ی انتخاب شده، این وب‌سرویس بررسی نمی‌کند که بارنامه متعلق به همان راننده‌ای
+          باشد که توکن از آن است؛ هر توکن معتبر <code>driver_waybills</code> برای هر شماره بارنامه‌ای
+          که پلمپ داشته باشد پاسخ می‌دهد.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 <?php endif; // پایان بخش راننده (role === 'driver') ?>
 
 <?php if ($role === 'operator'): ?>
@@ -1575,6 +1866,7 @@ window.API_LOGIN_URL = <?= json_encode((isset($_SERVER['HTTPS']) && $_SERVER['HT
 window.API_TRIP_ACTION_URL = <?= json_encode((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . '/api/trip_action.php') ?>;
 window.API_TEST_TRIP_TOKEN_URL = <?= json_encode(BASE_URL . '/api_test_trip_token.php') ?>;
 window.API_ACTIVE_WAYBILL_URL = <?= json_encode((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . '/api/active_waybill.php') ?>;
+window.API_SEAL_BY_WAYBILL_URL = <?= json_encode((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . '/api/seal_by_waybill.php') ?>;
 window.API_TEST_DRIVER_TOKEN_URL = <?= json_encode(BASE_URL . '/api_test_driver_token.php') ?>;
 window.API_GEOFENCE_CHECK_URL = <?= json_encode((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . '/map/geofence/check.php') ?>;
 window.API_OPERATOR_ACTION_URL = <?= json_encode((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . '/api/operator_action.php') ?>;

@@ -1,0 +1,100 @@
+<?php
+/**
+ * وب‌سرویس دریافت اطلاعات پلمپ بر اساس شماره بارنامه — بدون نیاز به ورود/سشن
+ * GET یا POST /api/seal_by_waybill.php?token=...&waybill_number=...
+ * ورودی: token و waybill_number (پارامتر GET یا POST/form-data/JSON)
+ * خروجی: همیشه JSON با ساختار ثابت { success, message, seal? }
+ * فیلدهای seal: id, seal_id, seal_password, service_uuid, characteristic_uuid
+ *
+ * فقط توکن معتبر و متعلق به یک حساب راننده فعال پذیرفته می‌شود (همان توکن
+ * driver_waybills که از طریق وب‌سرویس ورود یا صفحه driver_waybills.php صادر می‌شود).
+ * بارنامه باید متعلق به همان راننده باشد.
+ */
+require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../helpers/functions.php';
+require_once __DIR__ . '/../helpers/tokens.php';
+
+header('Content-Type: application/json; charset=utf-8');
+
+/** پاسخ استاندارد JSON */
+function json_response(int $status, bool $success, string $message, ?array $seal = null, bool $includeSeal = false): void
+{
+    http_response_code($status);
+    $body = ['success' => $success, 'message' => $message];
+    if ($includeSeal) {
+        $body['seal'] = $seal;
+    }
+    echo json_encode($body, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// فقط GET و POST مجاز است
+$method = $_SERVER['REQUEST_METHOD'];
+if ($method !== 'GET' && $method !== 'POST') {
+    json_response(405, false, 'متد درخواست مجاز نیست. فقط GET یا POST پذیرفته می‌شود.');
+}
+
+// خواندن ورودی‌ها: از GET، یا از form-data، یا از بدنه JSON
+$token = trim((string)($_GET['token'] ?? $_POST['token'] ?? ''));
+$waybillNumber = trim((string)($_GET['waybill_number'] ?? $_POST['waybill_number'] ?? ''));
+
+if ($token === '' || $waybillNumber === '') {
+    $raw = file_get_contents('php://input');
+    $decoded = json_decode((string)$raw, true);
+    if (is_array($decoded)) {
+        if ($token === '' && !empty($decoded['token'])) {
+            $token = trim((string)$decoded['token']);
+        }
+        if ($waybillNumber === '' && !empty($decoded['waybill_number'])) {
+            $waybillNumber = trim((string)$decoded['waybill_number']);
+        }
+    }
+}
+
+if ($token === '') {
+    json_response(422, false, 'ارسال توکن الزامی است.');
+}
+if ($waybillNumber === '') {
+    json_response(422, false, 'ارسال شماره بارنامه الزامی است.');
+}
+
+try {
+    $driver = validate_access_token($token, 'driver_waybills');
+
+    if (!$driver) {
+        json_response(401, false, 'توکن نامعتبر است یا منقضی شده است.');
+    }
+    if ($driver['user_type'] !== 'driver') {
+        json_response(403, false, 'این توکن متعلق به یک حساب راننده نیست.');
+    }
+    if ((int)($driver['is_active'] ?? 1) === 0) {
+        json_response(403, false, 'حساب کاربری شما غیرفعال شده است.');
+    }
+
+    $stmt = db()->prepare(
+        "SELECT sl.id, sl.seal_id, sl.seal_password, sl.service_uuid, sl.characteristic_uuid
+         FROM fuel_waybills w
+         INNER JOIN seals sl ON sl.fuel_waybill_id = w.id
+         WHERE w.waybill_number = ?
+         LIMIT 1"
+    );
+    $stmt->execute([$waybillNumber]);
+    $s = $stmt->fetch();
+
+    if (!$s) {
+        json_response(404, false, 'پلمپی برای این بارنامه یافت نشد.', null, true);
+    }
+
+    $seal = [
+        'id'                   => (int)$s['id'],
+        'seal_id'              => $s['seal_id'],
+        'seal_password'        => $s['seal_password'],
+        'service_uuid'         => $s['service_uuid'],
+        'characteristic_uuid'  => $s['characteristic_uuid'],
+    ];
+
+    json_response(200, true, 'اطلاعات پلمپ با موفقیت دریافت شد.', $seal, true);
+} catch (PDOException $e) {
+    error_log('API seal_by_waybill error: ' . $e->getMessage());
+    json_response(500, false, 'خطای داخلی سرور. لطفاً بعداً تلاش کنید.');
+}
