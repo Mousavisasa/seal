@@ -442,7 +442,7 @@ if ($driver) {
   var btnConfirmDirect = document.getElementById('btnConfirmDirect');
   
   btnConfirmDirect.addEventListener('click', function () {
-    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN)+'&'+WAYBILL;;
+    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN)+'&'+WAYBILL;
   });
 })();
 </script>
