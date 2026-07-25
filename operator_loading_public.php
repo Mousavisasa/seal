@@ -113,7 +113,7 @@ $statusClassMap = [
 <script src="<?= BASE_URL ?>/assets/js/iconify.min.js"></script>
 <script src="<?= BASE_URL ?>/assets/js/iconify-icons.js"></script>
 <style>
-.status-loading { background-color: #ffc107; color: white; }
+.status-loading { background-color: #ffc107; color: #f1770d; }
 .panel-card { border-radius: 12px; overflow: hidden; }
 .waybill-card { transition: all 0.3s ease; }
 .waybill-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
