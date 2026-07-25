@@ -23,6 +23,7 @@ require_once __DIR__ . '/helpers/tokens.php';
 $errors = [];
 $operator = null;
 $waybills = [];
+$waybillLogs = [];
 $submittedUsername = '';
 $token = trim((string)($_GET['token'] ?? ''));
 
@@ -88,6 +89,7 @@ if (!$operator && $_SERVER['REQUEST_METHOD'] === 'POST') {
 if ($operator) {
     try {
         ensure_operator_confirm_columns();
+        ensure_waybill_status_logs_table();
         $stmt = db()->prepare(
             "SELECT w.*, ol.title AS origin_title, dl.title AS destination_title,
                     drU.first_name AS driver_first, drU.last_name AS driver_last,
@@ -102,6 +104,44 @@ if ($operator) {
         );
         $stmt->execute([$operator['id'], $operator['id']]);
         $waybills = $stmt->fetchAll();
+
+        if ($waybills) {
+            $waybillIds = array_map(static function ($w) {
+                return (int)$w['id'];
+            }, $waybills);
+            $placeholders = implode(',', array_fill(0, count($waybillIds), '?'));
+            $logStmt = db()->prepare(
+                "SELECT l.*, w.waybill_number,
+                        u.first_name AS performed_first, u.last_name AS performed_last, u.national_code AS performed_nc
+                 FROM waybill_status_logs l
+                 INNER JOIN fuel_waybills w ON w.id = l.fuel_waybill_id
+                 LEFT JOIN users u ON u.id = l.performed_by
+                 WHERE l.fuel_waybill_id IN ($placeholders)
+                 ORDER BY l.changed_at DESC, l.id DESC"
+            );
+            $logStmt->execute($waybillIds);
+            foreach ($logStmt->fetchAll() as $logRow) {
+                $waybillId = (int)$logRow['fuel_waybill_id'];
+                if (!isset($waybillLogs[$waybillId])) {
+                    $waybillLogs[$waybillId] = [];
+                }
+                $waybillLogs[$waybillId][] = [
+                    'id' => (int)$logRow['id'],
+                    'waybill_id' => $waybillId,
+                    'waybill_number' => (string)$logRow['waybill_number'],
+                    'from_status' => (string)($logRow['from_status'] ?? ''),
+                    'to_status' => (string)$logRow['to_status'],
+                    'seal_number' => (string)($logRow['seal_number'] ?? ''),
+                    'source_section' => (string)$logRow['source_section'],
+                    'changed_at' => (string)$logRow['changed_at'],
+                    'changed_at_display' => to_jalali_datetime_display((string)$logRow['changed_at']),
+                    'performed_by_label' => !empty($logRow['performed_first'])
+                        ? trim((string)$logRow['performed_first'] . ' ' . (string)$logRow['performed_last'])
+                        : 'سیستم',
+                    'performed_nc' => (string)($logRow['performed_nc'] ?? ''),
+                ];
+            }
+        }
     } catch (PDOException $e) {
         error_log('Operator waybills lookup fetch error: ' . $e->getMessage());
         $errors[] = 'خطایی در دریافت فهرست بارنامه‌ها رخ داد.';
@@ -266,24 +306,34 @@ $statusClassMap = [
 
                               <div class="mt-auto pt-2 d-flex gap-2">
                                   <?php if ($actionApiUrl): ?>
-                                      <button type="button"
-                                              class="btn btn-success w-100 d-flex align-items-center justify-content-center gap-2 operator-status-btn"
-                                              data-api-url="<?= e($actionApiUrl) ?>"
-                                              data-waybill-id="<?= e((string)$w['id']) ?>"
-                                              data-confirm-message="<?= e($actionMessage) ?>">
-                                          <span class="iconify" data-icon="solar:check-circle-bold"></span> <?= e($actionLabel) ?>
-                                      </button>
+                                      <div class="flex-fill d-grid gap-2">
+                                        <button type="button"
+                                                class="btn btn-success w-100 d-flex align-items-center justify-content-center gap-2 operator-status-btn"
+                                                data-api-url="<?= e($actionApiUrl) ?>"
+                                                data-waybill-id="<?= e((string)$w['id']) ?>"
+                                                data-confirm-message="<?= e($actionMessage) ?>">
+                                            <span class="iconify" data-icon="solar:check-circle-bold"></span> <?= e($actionLabel) ?>
+                                        </button>
+                                      </div>
                                   <?php elseif ($confirmedAt): ?>
-                                      <div class="text-center w-100 text-muted small py-2">
+                                      <div class="text-center w-100 text-muted small py-2 flex-fill">
                                           <span class="iconify" data-icon="solar:check-circle-bold"></span> حضور شما در این بارنامه تایید شده است.
                                       </div>
                                   <?php else: ?>
-                                      <?php $opToken = create_operator_action_token((int)$operator['id'], $role, (int)$w['id']); ?>
-                                      <a href="<?= BASE_URL ?>/waybill_operator_geofence_check.php?token=<?= e(rawurlencode($opToken)) ?>"
-                                         class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
-                                          <span class="iconify" data-icon="solar:check-circle-bold"></span> تایید حضور
-                                      </a>
+                                      <div class="flex-fill d-grid gap-2">
+                                        <?php $opToken = create_operator_action_token((int)$operator['id'], $role, (int)$w['id']); ?>
+                                        <a href="<?= BASE_URL ?>/waybill_operator_geofence_check.php?token=<?= e(rawurlencode($opToken)) ?>"
+                                           class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
+                                            <span class="iconify" data-icon="solar:check-circle-bold"></span> تایید حضور
+                                        </a>
+                                      </div>
                                   <?php endif; ?>
+                                  <button type="button"
+                                          class="btn btn-outline-secondary d-flex align-items-center justify-content-center gap-2 waybill-log-btn"
+                                          data-waybill-id="<?= e((string)$w['id']) ?>"
+                                          data-waybill-number="<?= e($w['waybill_number']) ?>">
+                                      <span class="iconify" data-icon="solar:document-text-bold"></span> لاگ
+                                  </button>
                               </div>
                           </div>
                       </div>
@@ -311,8 +361,24 @@ $statusClassMap = [
 
 </div>
 
+<div class="modal fade" id="waybillLogsModal" tabindex="-1" aria-labelledby="waybillLogsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="waybillLogsModalLabel">لاگ بارنامه</h5>
+        <button type="button" class="btn-close ms-0" data-bs-dismiss="modal" aria-label="بستن"></button>
+      </div>
+      <div class="modal-body">
+        <div id="waybillLogsModalBody" class="d-grid gap-2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+const waybillStatusLogs = <?= json_encode($waybillLogs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+
 document.querySelectorAll('.toggle-pass').forEach(function (btn) {
   btn.addEventListener('click', function () {
     var input = document.getElementById(btn.getAttribute('data-target'));
@@ -321,6 +387,81 @@ document.querySelectorAll('.toggle-pass').forEach(function (btn) {
     input.type = isPass ? 'text' : 'password';
     var icon = btn.querySelector('.iconify');
     if (icon) icon.setAttribute('data-icon', isPass ? 'solar:eye-closed-bold' : 'solar:eye-bold');
+  });
+});
+
+var logsModalEl = document.getElementById('waybillLogsModal');
+var logsModal = logsModalEl ? new bootstrap.Modal(logsModalEl) : null;
+var logsModalTitle = document.getElementById('waybillLogsModalLabel');
+var logsModalBody = document.getElementById('waybillLogsModalBody');
+
+function createLogItem(log) {
+  var item = document.createElement('div');
+  item.className = 'border rounded-3 p-3 bg-light';
+
+  var header = document.createElement('div');
+  header.className = 'd-flex justify-content-between align-items-start gap-3 mb-2';
+
+  var left = document.createElement('div');
+  var title = document.createElement('div');
+  title.className = 'fw-bold';
+  title.textContent = (log.from_status ? log.from_status + ' → ' : '') + log.to_status;
+  left.appendChild(title);
+
+  var meta = document.createElement('div');
+  meta.className = 'small text-muted';
+  meta.textContent = log.changed_at_display || log.changed_at || '';
+  left.appendChild(meta);
+
+  var seal = document.createElement('span');
+  seal.className = 'badge text-bg-secondary ltr-text';
+  seal.textContent = log.seal_number && log.seal_number !== '' ? 'پلمپ: ' + log.seal_number : 'پلمپ: —';
+
+  header.appendChild(left);
+  header.appendChild(seal);
+  item.appendChild(header);
+
+  var details = document.createElement('div');
+  details.className = 'small text-muted d-grid gap-1';
+
+  var performer = document.createElement('div');
+  performer.textContent = 'ثبت‌کننده: ' + (log.performed_by_label || 'سیستم');
+  details.appendChild(performer);
+
+  var section = document.createElement('div');
+  section.textContent = 'منبع: ' + (log.source_section || '—');
+  details.appendChild(section);
+
+  item.appendChild(details);
+  return item;
+}
+
+document.querySelectorAll('.waybill-log-btn').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var waybillId = btn.getAttribute('data-waybill-id');
+    var waybillNumber = btn.getAttribute('data-waybill-number') || '';
+    var logs = waybillStatusLogs[waybillId] || [];
+
+    if (logsModalTitle) {
+      logsModalTitle.textContent = waybillNumber ? 'لاگ بارنامه ' + waybillNumber : 'لاگ بارنامه';
+    }
+    if (logsModalBody) {
+      logsModalBody.innerHTML = '';
+      if (!logs.length) {
+        var empty = document.createElement('div');
+        empty.className = 'alert alert-light border mb-0';
+        empty.textContent = 'برای این بارنامه هنوز لاگی ثبت نشده است.';
+        logsModalBody.appendChild(empty);
+      } else {
+        logs.forEach(function (log) {
+          logsModalBody.appendChild(createLogItem(log));
+        });
+      }
+    }
+
+    if (logsModal) {
+      logsModal.show();
+    }
   });
 });
 

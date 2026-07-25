@@ -170,7 +170,38 @@ function ensure_waybill_status_logs_table(): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
 
+    try {
+        $col = db()->query("SHOW COLUMNS FROM `waybill_status_logs` LIKE 'seal_number'")->fetch();
+        if (!$col) {
+            db()->exec("ALTER TABLE `waybill_status_logs` ADD COLUMN `seal_number` VARCHAR(50) NULL DEFAULT NULL AFTER `to_status`");
+        }
+    } catch (PDOException $e) {
+        error_log('ensure_waybill_status_logs_table seal_number error: ' . $e->getMessage());
+    }
+
     $ensured = true;
+}
+
+/**
+ * دریافت شماره پلمپِ متصل به بارنامه
+ */
+function resolve_waybill_seal_number(int $waybillId, ?PDO $pdo = null): ?string
+{
+    $conn = $pdo ?: db();
+    $stmt = $conn->prepare(
+        'SELECT s.seal_id
+         FROM seals s
+         WHERE s.fuel_waybill_id = ?
+         LIMIT 1'
+    );
+    $stmt->execute([$waybillId]);
+    $seal = $stmt->fetch();
+
+    if (!$seal || trim((string)($seal['seal_id'] ?? '')) === '') {
+        return null;
+    }
+
+    return trim((string)$seal['seal_id']);
 }
 
 /**
@@ -182,7 +213,8 @@ function log_waybill_status_change(
     string $toStatus,
     string $sourceSection,
     ?int $performedBy = null,
-    ?PDO $pdo = null
+    ?PDO $pdo = null,
+    ?string $sealNumber = null
 ): void {
     $sourceSection = trim($sourceSection);
     if ($sourceSection === '') {
@@ -191,14 +223,19 @@ function log_waybill_status_change(
 
     ensure_waybill_status_logs_table();
     $conn = $pdo ?: db();
+    $sealNumber = $sealNumber !== null ? trim($sealNumber) : null;
+    if ($sealNumber === '') {
+        $sealNumber = null;
+    }
     $stmt = $conn->prepare(
-        'INSERT INTO waybill_status_logs (fuel_waybill_id, from_status, to_status, source_section, performed_by)
-         VALUES (?, ?, ?, ?, ?)'
+        'INSERT INTO waybill_status_logs (fuel_waybill_id, from_status, to_status, seal_number, source_section, performed_by)
+         VALUES (?, ?, ?, ?, ?, ?)'
     );
     $stmt->execute([
         $waybillId,
         $fromStatus,
         $toStatus,
+        $sealNumber,
         $sourceSection,
         $performedBy !== null ? (int)$performedBy : null,
     ]);
@@ -212,7 +249,8 @@ function update_waybill_status_with_log(
     string $toStatus,
     string $sourceSection,
     ?int $performedBy = null,
-    array $extraAssignments = []
+    array $extraAssignments = [],
+    ?string $sealNumber = null
 ): void {
     ensure_waybill_status_logs_table();
     $pdo = db();
@@ -227,6 +265,9 @@ function update_waybill_status_with_log(
         }
 
         $fromStatus = $row['send_status'];
+        if ($sealNumber === null) {
+            $sealNumber = resolve_waybill_seal_number($waybillId, $pdo);
+        }
         $setParts = array_merge(['send_status = ?'], $extraAssignments);
         $sql = 'UPDATE fuel_waybills SET ' . implode(', ', $setParts) . ' WHERE id = ?';
         $params = [$toStatus, $waybillId];
@@ -234,7 +275,7 @@ function update_waybill_status_with_log(
         $upd = $pdo->prepare($sql);
         $upd->execute($params);
 
-        log_waybill_status_change($waybillId, $fromStatus, $toStatus, $sourceSection, $performedBy, $pdo);
+        log_waybill_status_change($waybillId, $fromStatus, $toStatus, $sourceSection, $performedBy, $pdo, $sealNumber);
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {

@@ -147,7 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 if ($canAttachSeal && $old['seal_id'] !== '') {
-                    $stmt = $pdo->prepare("SELECT id, region_id FROM seals WHERE id = ? AND seal_status = 'در انبار منطقه' LIMIT 1");
+                    $stmt = $pdo->prepare("SELECT id, seal_id, region_id FROM seals WHERE id = ? AND seal_status = 'در انبار منطقه' LIMIT 1");
                     $stmt->execute([(int)$old['seal_id']]);
                     $selectedSealRow = $stmt->fetch();
                     if (!$selectedSealRow) {
@@ -203,7 +203,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         null,
                         'ثبت شده',
                         'waybills/create.php: فرم ایجاد بارنامه',
-                        (int)($_SESSION['user_id'] ?? 0)
+                        (int)($_SESSION['user_id'] ?? 0),
+                        null,
+                        $selectedSealRow['seal_id'] ?? null
                     );
 
                     if ($canAttachSeal && $old['seal_id'] !== '') {

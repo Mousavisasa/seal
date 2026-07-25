@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS `waybill_status_logs` (
   `fuel_waybill_id` INT UNSIGNED NOT NULL,
   `from_status` VARCHAR(50) NULL DEFAULT NULL,
   `to_status` VARCHAR(50) NOT NULL,
+  `seal_number` VARCHAR(50) NULL DEFAULT NULL,
   `source_section` VARCHAR(150) NOT NULL,
   `performed_by` INT UNSIGNED NULL DEFAULT NULL,
   `changed_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -196,6 +197,7 @@ INSERT INTO `users` (`national_code`, `first_name`, `last_name`, `password`, `us
 --   `fuel_waybill_id` INT UNSIGNED NOT NULL,
 --   `from_status` VARCHAR(50) NULL DEFAULT NULL,
 --   `to_status` VARCHAR(50) NOT NULL,
+--   `seal_number` VARCHAR(50) NULL DEFAULT NULL,
 --   `source_section` VARCHAR(150) NOT NULL,
 --   `performed_by` INT UNSIGNED NULL DEFAULT NULL,
 --   `changed_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -208,4 +210,3 @@ INSERT INTO `users` (`national_code`, `first_name`, `last_name`, `password`, `us
 --   CONSTRAINT `fk_waybill_status_logs_performed_by` FOREIGN KEY (`performed_by`) REFERENCES `users` (`id`)
 --     ON UPDATE CASCADE ON DELETE SET NULL
 -- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
