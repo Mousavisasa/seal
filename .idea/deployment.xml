@@ -3,15 +3,18 @@
   <component name="PublishConfigData" serverName="myftp" uploadOnCheckin="ccf567cb-70c8-4470-bcf0-2aba8f248e5f" remoteFilesAllowedToDisappearOnAutoupload="false" confirmBeforeUploading="false">
     <option name="confirmBeforeUploading" value="false" />
     <serverData>
+      <paths name="Local or mounted folder">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="javad">
         <serverdata>
           <mappings>
-            <mapping deploy="/" local="$PROJECT_DIR$" web="/" />
+            <mapping local="$PROJECT_DIR$" web="/" />
           </mappings>
-          <excludedPaths>
-            <excludedPath local="true" path="$PROJECT_DIR$/config/config.php" />
-            <excludedPath path="/config/config.php" />
-          </excludedPaths>
         </serverdata>
       </paths>
       <paths name="myftp">
