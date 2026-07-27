@@ -71,10 +71,11 @@ try {
     // روی سرور ساخته نشده باشد، ورود کاربر همچنان موفق است، فقط توکن در پاسخ نمی‌آید.
     $token = null;
     try {
-        $token = create_access_token((int)$user['id'], 'driver_waybills');
+        $token = create_access_token((int)$user['id'], $user['user_type'].'_waybills');
     } catch (PDOException $e) {
-        error_log('Access token creation failed (is the access_tokens table created? run database.sql): ' . $e->getMessage());
+        error_log('Access token creation failed (is the access_tokens table created? run database.sql): ' . $e->getMessage().$user);
     }
+
 
     // حذف هش رمز از خروجی
     unset($user['password']);
