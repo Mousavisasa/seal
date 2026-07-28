@@ -430,7 +430,7 @@ body { background: var(--surface); color: var(--ink); }
 }
 
 /* ---------- ماژول بارنامه سوخت ---------- */
-.status-badge { font-weight: 600; font-size: .78rem; padding: .4em .8em; border-radius: 2rem; color: #ffff00;
+.status-badge { font-weight: 600; font-size: .78rem; padding: .4em .8em; border-radius: 2rem; color: #ffff00; background-color: saddlebrown;
 }
 .status-registered { background: var(--purple-dark); }
 .status-sent        { background: #b26a00; }
