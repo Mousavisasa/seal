@@ -6,9 +6,12 @@
  * خروجی: همیشه JSON با ساختار ثابت { success, message, seal? }
  * فیلدهای seal: id, seal_id, seal_password, service_uuid, characteristic_uuid
  *
- * فقط توکن معتبر و متعلق به یک حساب راننده فعال پذیرفته می‌شود (همان توکن
- * driver_waybills که از طریق وب‌سرویس ورود یا صفحه driver_waybills.php صادر می‌شود).
- * بارنامه باید متعلق به همان راننده باشد.
+ * توکن معتبر و متعلق به یک حساب فعالِ راننده یا متصدی پذیرفته می‌شود:
+ * - راننده: همان توکن driver_waybills که از طریق وب‌سرویس ورود یا صفحه
+ *   driver_waybills.php صادر می‌شود.
+ * - متصدی: همان توکن operator_waybills که از طریق وب‌سرویس ورود یا صفحه
+ *   operator_waybills_public.php صادر می‌شود؛ در این حالت بارنامه باید یکی
+ *   از بارنامه‌های تخصیص‌یافته به همان متصدی (به‌عنوان متصدی مبدا یا مقصد) باشد.
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../helpers/functions.php';
@@ -59,26 +62,50 @@ if ($waybillNumber === '') {
 }
 
 try {
+    // ابتدا توکن راننده امتحان می‌شود؛ اگر معتبر نبود، به‌عنوان توکن متصدی بررسی می‌شود
     $driver = validate_access_token($token, 'driver_waybills');
+    $operator = $driver ? null : validate_access_token($token, 'operator_waybills');
 
-    if (!$driver) {
+    if (!$driver && !$operator) {
         json_response(401, false, 'توکن نامعتبر است یا منقضی شده است.');
     }
-    if ($driver['user_type'] !== 'driver') {
-        json_response(403, false, 'این توکن متعلق به یک حساب راننده نیست.');
-    }
-    if ((int)($driver['is_active'] ?? 1) === 0) {
-        json_response(403, false, 'حساب کاربری شما غیرفعال شده است.');
+
+    if ($driver) {
+        if ($driver['user_type'] !== 'driver') {
+            json_response(403, false, 'این توکن متعلق به یک حساب راننده نیست.');
+        }
+        if ((int)($driver['is_active'] ?? 1) === 0) {
+            json_response(403, false, 'حساب کاربری شما غیرفعال شده است.');
+        }
+
+        $stmt = db()->prepare(
+            "SELECT sl.id, sl.seal_id, sl.seal_password, sl.service_uuid, sl.characteristic_uuid
+             FROM fuel_waybills w
+             INNER JOIN seals sl ON sl.fuel_waybill_id = w.id
+             WHERE w.waybill_number = ?
+             LIMIT 1"
+        );
+        $stmt->execute([$waybillNumber]);
+    } else {
+        if ($operator['user_type'] !== 'operator') {
+            json_response(403, false, 'این توکن متعلق به یک حساب متصدی نیست.');
+        }
+        if ((int)($operator['is_active'] ?? 1) === 0) {
+            json_response(403, false, 'حساب کاربری شما غیرفعال شده است.');
+        }
+
+        // متصدی فقط می‌تواند پلمپ بارنامه‌ای را ببیند که به‌عنوان متصدی مبدا یا مقصد آن تخصیص یافته
+        $stmt = db()->prepare(
+            "SELECT sl.id, sl.seal_id, sl.seal_password, sl.service_uuid, sl.characteristic_uuid
+             FROM fuel_waybills w
+             INNER JOIN seals sl ON sl.fuel_waybill_id = w.id
+             WHERE w.waybill_number = ?
+               AND (w.origin_operator_user_id = ? OR w.destination_operator_user_id = ?)
+             LIMIT 1"
+        );
+        $stmt->execute([$waybillNumber, $operator['id'], $operator['id']]);
     }
 
-    $stmt = db()->prepare(
-        "SELECT sl.id, sl.seal_id, sl.seal_password, sl.service_uuid, sl.characteristic_uuid
-         FROM fuel_waybills w
-         INNER JOIN seals sl ON sl.fuel_waybill_id = w.id
-         WHERE w.waybill_number = ?
-         LIMIT 1"
-    );
-    $stmt->execute([$waybillNumber]);
     $s = $stmt->fetch();
 
     if (!$s) {
