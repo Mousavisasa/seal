@@ -540,6 +540,7 @@
   var sealSendBtn = document.getElementById('sealSendBtn');
   var sealApiUrl = window.API_SEAL_BY_WAYBILL_URL;
   var mintDriverTokenUrl = window.API_TEST_DRIVER_TOKEN_URL;
+  var mintOperatorTokenUrl = window.API_TEST_OPERATOR_TOKEN_URL;
 
   // نمایش آدرس و نمونه‌کدهای مستندات با آدرس واقعی سرور (صرف‌نظر از اینکه
   // راننده‌ای برای تست زنده موجود باشد یا نه، همیشه اجرا می‌شود)
@@ -573,16 +574,39 @@
     'curl_close($ch);\n' +
     '$data = json_decode($response, true);';
 
-  if (!sealSendBtn) return; // راننده فعالی برای تست زنده وجود ندارد یا در این زیرصفحه نیستیم
+  if (!sealSendBtn) return; // راننده/متصدی فعالی برای تست زنده وجود ندارد یا در این زیرصفحه نیستیم
 
+  var sealRoleRadios = document.getElementsByName('sealRoleRadio');
   var sealDriverSelect = document.getElementById('sealDriverSelect');
+  var sealOperatorSelect = document.getElementById('sealOperatorSelect');
+  var sealDriverSelectWrap = document.getElementById('sealDriverSelectWrap');
+  var sealOperatorSelectWrap = document.getElementById('sealOperatorSelectWrap');
   var sealWaybillNumberInput = document.getElementById('sealWaybillNumberInput');
   var sealClearBtn = document.getElementById('sealClearBtn');
   var sealResultBox = document.getElementById('sealResultBox');
+  var sealTokenLabel = document.getElementById('sealTokenLabel');
   var sealTokenText = document.getElementById('sealTokenText');
   var sealStatusBadge = document.getElementById('sealStatusBadge');
   var sealTimeBadge = document.getElementById('sealTimeBadge');
   var sealResponseEl = document.getElementById('sealResponse');
+
+  function getSealRole() {
+    for (var i = 0; i < sealRoleRadios.length; i++) {
+      if (sealRoleRadios[i].checked) return sealRoleRadios[i].value;
+    }
+    return 'driver';
+  }
+
+  function updateSealRoleUi() {
+    var role = getSealRole();
+    if (sealDriverSelectWrap) sealDriverSelectWrap.style.display = role === 'driver' ? '' : 'none';
+    if (sealOperatorSelectWrap) sealOperatorSelectWrap.style.display = role === 'operator' ? '' : 'none';
+  }
+
+  for (var ri = 0; ri < sealRoleRadios.length; ri++) {
+    sealRoleRadios[ri].addEventListener('change', updateSealRoleUi);
+  }
+  updateSealRoleUi();
 
   function showSealResult(status, body, ms, isNetworkError) {
     if (!sealResultBox || !sealStatusBadge || !sealTimeBadge || !sealResponseEl) return;
@@ -598,18 +622,26 @@
   }
 
   sealSendBtn.addEventListener('click', function () {
-    var driverId = sealDriverSelect ? sealDriverSelect.value : '';
+    var role = getSealRole();
+    var isOperator = role === 'operator';
+    var userId = isOperator
+      ? (sealOperatorSelect ? sealOperatorSelect.value : '')
+      : (sealDriverSelect ? sealDriverSelect.value : '');
     var waybillNumber = sealWaybillNumberInput ? sealWaybillNumberInput.value.trim() : '';
-    if (!driverId || !waybillNumber) return;
+    if (!userId || !waybillNumber) return;
+
+    var mintUrl = isOperator ? mintOperatorTokenUrl : mintDriverTokenUrl;
+    var mintBodyField = isOperator ? 'operator_id' : 'driver_id';
 
     sealSendBtn.disabled = true;
+    if (sealTokenLabel) sealTokenLabel.textContent = (isOperator ? 'توکن متصدی مورد استفاده:' : 'توکن راننده مورد استفاده:');
     if (sealTokenText) sealTokenText.textContent = 'در حال ساخت توکن…';
     var start = (window.performance && performance.now) ? performance.now() : Date.now();
 
-    fetch(mintDriverTokenUrl, {
+    fetch(mintUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'driver_id=' + encodeURIComponent(driverId)
+      body: mintBodyField + '=' + encodeURIComponent(userId)
     })
       .then(function (r) { return r.json(); })
       .then(function (mintData) {

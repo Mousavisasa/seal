@@ -79,6 +79,20 @@ try {
     error_log('api_test active drivers list fetch error: ' . $e->getMessage());
 }
 
+// متصدیان فعال — برای ساخت توکن آزمایشی در تست وب‌سرویس دریافت پلمپ بر اساس شماره بارنامه
+// (این وب‌سرویس توکن متصدی را هم می‌پذیرد، به‌شرطی که بارنامه به همان متصدی تخصیص یافته باشد)
+$allActiveOperators = [];
+try {
+    $allActiveOperators = db()->query(
+        "SELECT id, first_name, last_name, national_code
+         FROM users
+         WHERE user_type = 'operator' AND is_active = 1
+         ORDER BY id DESC"
+    )->fetchAll();
+} catch (PDOException $e) {
+    error_log('api_test active operators list fetch error: ' . $e->getMessage());
+}
+
 // بارنامه‌هایی که یک متصدی (مبدا یا مقصد) دارند و هنوز حضورش تایید نشده — برای
 // تست زنده وب‌سرویس تایید حضور متصدی (معادل شروع/پایان سفر راننده)
 $operatorPendingConfirm = [];
@@ -980,19 +994,40 @@ require __DIR__ . '/includes/header.php';
     </div>
     <div class="card-body p-4">
 
-      <?php if (!$allActiveDrivers): ?>
+      <?php if (!$allActiveDrivers && !$allActiveOperators): ?>
         <div class="text-muted small">
-          در حال حاضر هیچ راننده فعالی در سیستم وجود ندارد. برای تست این وب‌سرویس ابتدا باید
-          حداقل یک راننده فعال ثبت شده باشد.
+          در حال حاضر هیچ راننده یا متصدی فعالی در سیستم وجود ندارد. برای تست این وب‌سرویس ابتدا باید
+          حداقل یک حساب راننده یا متصدی فعال ثبت شده باشد.
         </div>
       <?php else: ?>
+        <div class="mb-3">
+          <label class="form-label d-block">نوع توکن آزمایشی</label>
+          <div class="btn-group" role="group" aria-label="نوع توکن">
+            <input type="radio" class="btn-check" name="sealRoleRadio" id="sealRoleDriver" value="driver" <?= $allActiveDrivers ? 'checked' : 'disabled' ?>>
+            <label class="btn btn-outline-primary" for="sealRoleDriver">راننده (<code>driver_waybills</code>)</label>
+
+            <input type="radio" class="btn-check" name="sealRoleRadio" id="sealRoleOperator" value="operator" <?= (!$allActiveDrivers && $allActiveOperators) ? 'checked' : '' ?> <?= !$allActiveOperators ? 'disabled' : '' ?>>
+            <label class="btn btn-outline-primary" for="sealRoleOperator">متصدی (<code>operator_waybills</code>)</label>
+          </div>
+        </div>
+
         <div class="row g-3 align-items-end">
-          <div class="col-md-6">
+          <div class="col-md-6" id="sealDriverSelectWrap" <?= $allActiveDrivers ? '' : 'style="display:none"' ?>>
             <label class="form-label" for="sealDriverSelect">راننده برای ساخت توکن آزمایشی</label>
             <select class="form-select" id="sealDriverSelect">
               <?php foreach ($allActiveDrivers as $d): ?>
                 <option value="<?= e((string)$d['id']) ?>">
                   راننده <?= e($d['first_name'] . ' ' . $d['last_name']) ?> (<?= e($d['national_code']) ?>)
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="col-md-6" id="sealOperatorSelectWrap" <?= ($allActiveOperators && !$allActiveDrivers) ? '' : 'style="display:none"' ?>>
+            <label class="form-label" for="sealOperatorSelect">متصدی برای ساخت توکن آزمایشی</label>
+            <select class="form-select" id="sealOperatorSelect">
+              <?php foreach ($allActiveOperators as $o): ?>
+                <option value="<?= e((string)$o['id']) ?>">
+                  متصدی <?= e($o['first_name'] . ' ' . $o['last_name']) ?> (<?= e($o['national_code']) ?>)
                 </option>
               <?php endforeach; ?>
             </select>
@@ -1030,7 +1065,7 @@ require __DIR__ . '/includes/header.php';
         <!-- نتیجه -->
         <div id="sealResultBox" class="mt-4 d-none">
           <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-            <span class="fw-bold">توکن راننده مورد استفاده:</span>
+            <span class="fw-bold" id="sealTokenLabel">توکن مورد استفاده:</span>
             <code class="ltr-code" id="sealTokenText"></code>
           </div>
           <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
@@ -1089,9 +1124,11 @@ require __DIR__ . '/includes/header.php';
           <tbody>
             <tr>
               <td><code>token</code></td><td>رشته</td><td>بله</td>
-              <td>یک توکن معتبر و فعال <code>driver_waybills</code> (از وب‌سرویس ورود یا صفحه
-                <code>driver_waybills.php</code>)؛ صرفاً هویت راننده را احراز می‌کند و مالکیت بارنامه
-                بررسی نمی‌شود.</td>
+              <td>یک توکن معتبر و فعال، یا <code>driver_waybills</code> (راننده) یا
+                <code>operator_waybills</code> (متصدی) — از وب‌سرویس ورود یا صفحات
+                <code>driver_waybills.php</code> / <code>operator_waybills_public.php</code>.
+                برای توکن راننده، مالکیت بارنامه بررسی نمی‌شود؛ برای توکن متصدی، بارنامه باید
+                یکی از بارنامه‌های تخصیص‌یافته به همان متصدی (مبدا یا مقصد) باشد.</td>
             </tr>
             <tr>
               <td><code>waybill_number</code></td><td>رشته</td><td>بله</td>
@@ -1157,8 +1194,8 @@ require __DIR__ . '/includes/header.php';
           <tbody>
             <tr><td><span class="badge role-badge role-driver">200</span></td><td>موفق</td><td>پلمپ متصل به این بارنامه برگردانده شد</td></tr>
             <tr><td><span class="badge role-badge role-operator">401</span></td><td>عدم احراز</td><td>توکن نامعتبر است یا منقضی شده است</td></tr>
-            <tr><td><span class="badge role-badge role-operator">403</span></td><td>عدم دسترسی</td><td>توکن متعلق به راننده نیست یا حساب غیرفعال است</td></tr>
-            <tr><td><span class="badge role-badge role-region">404</span></td><td>یافت نشد</td><td>بارنامه‌ای با این شماره وجود ندارد یا پلمپی به آن متصل نیست</td></tr>
+            <tr><td><span class="badge role-badge role-operator">403</span></td><td>عدم دسترسی</td><td>توکن متعلق به راننده/متصدی نیست یا حساب غیرفعال است</td></tr>
+            <tr><td><span class="badge role-badge role-region">404</span></td><td>یافت نشد</td><td>بارنامه‌ای با این شماره وجود ندارد، پلمپی به آن متصل نیست، یا (برای توکن متصدی) بارنامه به آن متصدی تخصیص نیافته</td></tr>
             <tr><td><span class="badge role-badge role-region">405</span></td><td>متد غیرمجاز</td><td>فقط GET یا POST پذیرفته می‌شود</td></tr>
             <tr><td><span class="badge role-badge role-operator">422</span></td><td>ورودی ناقص</td><td>توکن یا شماره بارنامه ارسال نشده است</td></tr>
             <tr><td><span class="badge role-badge role-admin">500</span></td><td>خطای سرور</td><td>خطای داخلی؛ جزئیات فنی هرگز افشا نمی‌شود</td></tr>
@@ -1218,7 +1255,9 @@ require __DIR__ . '/includes/header.php';
           <strong>نکات:</strong> این وب‌سرویس فقط خواندنی است و هیچ داده‌ای را تغییر نمی‌دهد. برخلاف
           وب‌سرویس بارنامه ی انتخاب شده، این وب‌سرویس بررسی نمی‌کند که بارنامه متعلق به همان راننده‌ای
           باشد که توکن از آن است؛ هر توکن معتبر <code>driver_waybills</code> برای هر شماره بارنامه‌ای
-          که پلمپ داشته باشد پاسخ می‌دهد.
+          که پلمپ داشته باشد پاسخ می‌دهد. اما برای توکن <code>operator_waybills</code>، برخلاف راننده،
+          مالکیت بررسی می‌شود: فقط بارنامه‌ای که همان متصدی به‌عنوان متصدی مبدا یا مقصد آن تخصیص یافته
+          پاسخ می‌گیرد؛ در غیر این صورت پاسخ ۴۰۴ «یافت نشد» برمی‌گردد.
         </div>
       </div>
     </div>
