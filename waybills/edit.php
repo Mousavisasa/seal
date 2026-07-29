@@ -14,12 +14,13 @@ $myRegionId = session_region_id();
 
 $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
 $waybill = null;
+$waybillInfo = [];
 $errors = [];
 $locations = [];
 
 try {
     $locations = db()->query(
-        'SELECT l.id, l.location_code, l.title, l.region_id, l.lat, l.lon, r.region_name
+            'SELECT l.id, l.location_code, l.title, l.region_id, l.lat, l.lon, r.region_name
          FROM locations l INNER JOIN regions r ON r.region_code = l.region_id
          ORDER BY l.title'
     )->fetchAll();
@@ -27,6 +28,28 @@ try {
     $stmt = db()->prepare('SELECT * FROM fuel_waybills WHERE id = ? LIMIT 1');
     $stmt->execute([$id]);
     $waybill = $stmt->fetch();
+
+    if ($waybill) {
+        $stmt = db()->prepare(
+                'SELECT
+                drU.first_name AS driver_first, drU.last_name AS driver_last, drU.national_code AS driver_nc,
+                drU.is_active AS driver_active,
+                opOrig.first_name AS origin_op_first, opOrig.last_name AS origin_op_last, opOrig.national_code AS origin_op_nc,
+                opOrig.is_active AS origin_op_active,
+                opDest.first_name AS dest_op_first, opDest.last_name AS dest_op_last, opDest.national_code AS dest_op_nc,
+                opDest.is_active AS dest_op_active,
+                sl.seal_id AS seal_number, sl.seal_status AS seal_status
+             FROM fuel_waybills w
+             LEFT JOIN users drU ON drU.id = w.driver_user_id
+             LEFT JOIN users opOrig ON opOrig.id = w.origin_operator_user_id
+             LEFT JOIN users opDest ON opDest.id = w.destination_operator_user_id
+             LEFT JOIN seals sl ON sl.fuel_waybill_id = w.id
+             WHERE w.id = ?
+             LIMIT 1'
+        );
+        $stmt->execute([$waybill['id']]);
+        $waybillInfo = $stmt->fetch() ?: [];
+    }
 } catch (PDOException $e) {
     error_log('Waybill edit form data error: ' . $e->getMessage());
 }
@@ -56,12 +79,12 @@ if ($myRegionId !== null && !waybill_in_region($waybill, $locations, $myRegionId
 }
 
 $old = [
-    'origin_location_id'      => (string)$waybill['origin_location_id'],
-    'destination_location_id' => (string)$waybill['destination_location_id'],
-    'distance_km'              => (string)$waybill['distance_km'],
-    'product_type'             => $waybill['product_type'],
-    'waybill_number'           => $waybill['waybill_number'],
-    'issue_date_jalali'        => to_jalali_display($waybill['issue_date']),
+        'origin_location_id'      => (string)$waybill['origin_location_id'],
+        'destination_location_id' => (string)$waybill['destination_location_id'],
+        'distance_km'              => (string)$waybill['distance_km'],
+        'product_type'             => $waybill['product_type'],
+        'waybill_number'           => $waybill['waybill_number'],
+        'issue_date_jalali'        => to_jalali_display($waybill['issue_date']),
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -99,9 +122,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'انتخاب مقصد الزامی است.';
         }
         if (
-            (int)$old['origin_location_id'] > 0
-            && (int)$old['destination_location_id'] > 0
-            && (int)$old['origin_location_id'] === (int)$old['destination_location_id']
+                (int)$old['origin_location_id'] > 0
+                && (int)$old['destination_location_id'] > 0
+                && (int)$old['origin_location_id'] === (int)$old['destination_location_id']
         ) {
             $errors[] = 'مبدا و مقصد نمی‌توانند یکسان باشند.';
         }
@@ -146,19 +169,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $errors[] = 'بارنامه دیگری با این شماره قبلاً ثبت شده است.';
                 } else {
                     $stmt = db()->prepare(
-                        'UPDATE fuel_waybills SET
+                            'UPDATE fuel_waybills SET
                             origin_location_id = ?, destination_location_id = ?, distance_km = ?, product_type = ?,
                             waybill_number = ?, issue_date = ?
                          WHERE id = ?'
                     );
                     $stmt->execute([
-                        (int)$old['origin_location_id'],
-                        (int)$old['destination_location_id'],
-                        (float)$old['distance_km'],
-                        $old['product_type'],
-                        $old['waybill_number'],
-                        $issueDateGregorian,
-                        $waybill['id'],
+                            (int)$old['origin_location_id'],
+                            (int)$old['destination_location_id'],
+                            (float)$old['distance_km'],
+                            $old['product_type'],
+                            $old['waybill_number'],
+                            $issueDateGregorian,
+                            $waybill['id'],
                     ]);
                     set_flash('success', 'بارنامه با موفقیت ویرایش شد.');
                     header('Location: ' . BASE_URL . '/waybills/list.php');
@@ -178,180 +201,249 @@ require __DIR__ . '/../includes/header.php';
 ?>
 
 <div class="mb-4">
-  <h1 class="h4 fw-bold mb-1">ویرایش بارنامه سوخت</h1>
-  <p class="text-muted small mb-0">اطلاعات اصلی بارنامه را ویرایش کنید.</p>
+    <h1 class="h4 fw-bold mb-1">ویرایش بارنامه سوخت</h1>
+    <p class="text-muted small mb-0">اطلاعات اصلی بارنامه را ویرایش کنید.</p>
 </div>
 
 <?php if ($errors): ?>
-  <div class="alert alert-danger">
-    <div class="d-flex align-items-center gap-2 fw-bold mb-2">
-      <span class="iconify" data-icon="solar:danger-triangle-bold"></span> فرم دارای خطا است:
+    <div class="alert alert-danger">
+        <div class="d-flex align-items-center gap-2 fw-bold mb-2">
+            <span class="iconify" data-icon="solar:danger-triangle-bold"></span> فرم دارای خطا است:
+        </div>
+        <ul class="mb-0 pe-4">
+            <?php foreach ($errors as $err): ?><li><?= e($err) ?></li><?php endforeach; ?>
+        </ul>
     </div>
-    <ul class="mb-0 pe-4">
-      <?php foreach ($errors as $err): ?><li><?= e($err) ?></li><?php endforeach; ?>
-    </ul>
-  </div>
 <?php endif; ?>
 
+<div class="card panel-card mb-3">
+    <div class="card-header d-flex align-items-center gap-2">
+        <span class="iconify text-jade fs-5" data-icon="solar:info-circle-bold"></span>
+        <span class="fw-bold">اطلاعات فعلی بارنامه</span>
+    </div>
+    <div class="card-body p-4">
+        <div class="row g-3">
+
+            <div class="col-md-6 col-lg-3">
+                <div class="text-muted small mb-1 d-flex align-items-center gap-1">
+                    <span class="iconify" data-icon="solar:bus-bold"></span> راننده
+                </div>
+                <?php if (!empty($waybillInfo['driver_first'])): ?>
+                    <div class="fw-bold"><?= e($waybillInfo['driver_first'] . ' ' . $waybillInfo['driver_last']) ?></div>
+                    <div class="text-muted small ltr-text"><?= e($waybillInfo['driver_nc']) ?></div>
+                    <?php if ((int)($waybillInfo['driver_active'] ?? 1) === 0): ?>
+                        <span class="badge bg-secondary mt-1">غیرفعال</span>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <span class="badge bg-light text-muted border">تخصیص نیافته</span>
+                <?php endif; ?>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="text-muted small mb-1 d-flex align-items-center gap-1">
+                    <span class="iconify" data-icon="solar:user-id-bold"></span> متصدی مبدا
+                </div>
+                <?php if (!empty($waybillInfo['origin_op_first'])): ?>
+                    <div class="fw-bold"><?= e($waybillInfo['origin_op_first'] . ' ' . $waybillInfo['origin_op_last']) ?></div>
+                    <div class="text-muted small ltr-text"><?= e($waybillInfo['origin_op_nc']) ?></div>
+                    <?php if ((int)($waybillInfo['origin_op_active'] ?? 1) === 0): ?>
+                        <span class="badge bg-secondary mt-1">غیرفعال</span>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <span class="badge bg-light text-muted border">تخصیص نیافته</span>
+                <?php endif; ?>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="text-muted small mb-1 d-flex align-items-center gap-1">
+                    <span class="iconify" data-icon="solar:user-id-bold"></span> متصدی مقصد
+                </div>
+                <?php if (!empty($waybillInfo['dest_op_first'])): ?>
+                    <div class="fw-bold"><?= e($waybillInfo['dest_op_first'] . ' ' . $waybillInfo['dest_op_last']) ?></div>
+                    <div class="text-muted small ltr-text"><?= e($waybillInfo['dest_op_nc']) ?></div>
+                    <?php if ((int)($waybillInfo['dest_op_active'] ?? 1) === 0): ?>
+                        <span class="badge bg-secondary mt-1">غیرفعال</span>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <span class="badge bg-light text-muted border">تخصیص نیافته</span>
+                <?php endif; ?>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="text-muted small mb-1 d-flex align-items-center gap-1">
+                    <span class="iconify" data-icon="solar:lock-password-unlocked-bold"></span> شماره پلمپ
+                </div>
+                <?php if (!empty($waybillInfo['seal_number'])): ?>
+                    <div class="fw-bold ltr-text"><?= e($waybillInfo['seal_number']) ?></div>
+                    <span class="badge bg-light text-muted border"><?= e((string)$waybillInfo['seal_status']) ?></span>
+                <?php else: ?>
+                    <span class="badge bg-light text-muted border">الصاق نشده</span>
+                <?php endif; ?>
+            </div>
+
+        </div>
+    </div>
+</div>
+
 <div class="card panel-card">
-  <div class="card-body p-4">
-    <form method="post" action="<?= BASE_URL ?>/waybills/edit.php" novalidate>
-      <?= csrf_field() ?>
-      <input type="hidden" name="id" value="<?= e((string)$waybill['id']) ?>">
-      <div class="row g-3">
+    <div class="card-body p-4">
+        <form method="post" action="<?= BASE_URL ?>/waybills/edit.php" novalidate>
+            <?= csrf_field() ?>
+            <input type="hidden" name="id" value="<?= e((string)$waybill['id']) ?>">
+            <div class="row g-3">
 
-        <div class="col-md-6">
-          <label class="form-label" for="waybill_number">شماره بارنامه</label>
-          <div class="input-group">
-            <span class="input-group-text"><span class="iconify" data-icon="solar:document-text-bold"></span></span>
-            <input type="text" class="form-control ltr-text" id="waybill_number" name="waybill_number" required maxlength="50"
-                   value="<?= e($old['waybill_number']) ?>">
-          </div>
-        </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="waybill_number">شماره بارنامه</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><span class="iconify" data-icon="solar:document-text-bold"></span></span>
+                        <input type="text" class="form-control ltr-text" id="waybill_number" name="waybill_number" required maxlength="50"
+                               value="<?= e($old['waybill_number']) ?>">
+                    </div>
+                </div>
 
-        <div class="col-md-6">
-          <label class="form-label" for="issue_date_jalali">تاریخ صدور بارنامه</label>
-          <div class="input-group">
-            <span class="input-group-text"><span class="iconify" data-icon="solar:calendar-bold"></span></span>
-            <input type="text" class="form-control ltr-text" id="issue_date_jalali" name="issue_date_jalali" required
-                   autocomplete="off" data-jalali-datepicker
-                   value="<?= e($old['issue_date_jalali']) ?>">
-          </div>
-          <div class="form-text">فرمت: سال/ماه/روز (تقویم شمسی)</div>
-        </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="issue_date_jalali">تاریخ صدور بارنامه</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><span class="iconify" data-icon="solar:calendar-bold"></span></span>
+                        <input type="text" class="form-control ltr-text" id="issue_date_jalali" name="issue_date_jalali" required
+                               autocomplete="off" data-jalali-datepicker
+                               value="<?= e($old['issue_date_jalali']) ?>">
+                    </div>
+                    <div class="form-text">فرمت: سال/ماه/روز (تقویم شمسی)</div>
+                </div>
 
-        <div class="col-md-6">
-          <label class="form-label" for="origin_location_id">کد مبدا</label>
-          <div class="input-group">
-            <span class="input-group-text"><span class="iconify" data-icon="solar:point-on-map-bold"></span></span>
-            <select class="form-select" id="origin_location_id" name="origin_location_id" required>
-              <option value="">— انتخاب کنید —</option>
-              <?php foreach ($locations as $l): ?>
-                <option value="<?= e((string)$l['id']) ?>"
-                        data-region="<?= e((string)$l['region_id']) ?>"
-                        data-lat="<?= e((string)$l['lat']) ?>"
-                        data-lon="<?= e((string)$l['lon']) ?>"
-                        <?= (string)$l['id'] === $old['origin_location_id'] ? 'selected' : '' ?>>
-                  <?= e($l['title']) ?> (<?= e($l['location_code']) ?>) — <?= e($l['region_name']) ?>
-                </option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-        </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="origin_location_id">کد مبدا</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><span class="iconify" data-icon="solar:point-on-map-bold"></span></span>
+                        <select class="form-select" id="origin_location_id" name="origin_location_id" required>
+                            <option value="">— انتخاب کنید —</option>
+                            <?php foreach ($locations as $l): ?>
+                                <option value="<?= e((string)$l['id']) ?>"
+                                        data-region="<?= e((string)$l['region_id']) ?>"
+                                        data-lat="<?= e((string)$l['lat']) ?>"
+                                        data-lon="<?= e((string)$l['lon']) ?>"
+                                        <?= (string)$l['id'] === $old['origin_location_id'] ? 'selected' : '' ?>>
+                                    <?= e($l['title']) ?> (<?= e($l['location_code']) ?>) — <?= e($l['region_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
 
-        <div class="col-md-6">
-          <label class="form-label" for="destination_location_id">کد مقصد</label>
-          <div class="input-group">
-            <span class="input-group-text"><span class="iconify" data-icon="solar:point-on-map-bold"></span></span>
-            <select class="form-select" id="destination_location_id" name="destination_location_id" required>
-              <option value="">— انتخاب کنید —</option>
-              <?php foreach ($locations as $l): ?>
-                <option value="<?= e((string)$l['id']) ?>"
-                        data-region="<?= e((string)$l['region_id']) ?>"
-                        data-lat="<?= e((string)$l['lat']) ?>"
-                        data-lon="<?= e((string)$l['lon']) ?>"
-                        <?= (string)$l['id'] === $old['destination_location_id'] ? 'selected' : '' ?>>
-                  <?= e($l['title']) ?> (<?= e($l['location_code']) ?>) — <?= e($l['region_name']) ?>
-                </option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-        </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="destination_location_id">کد مقصد</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><span class="iconify" data-icon="solar:point-on-map-bold"></span></span>
+                        <select class="form-select" id="destination_location_id" name="destination_location_id" required>
+                            <option value="">— انتخاب کنید —</option>
+                            <?php foreach ($locations as $l): ?>
+                                <option value="<?= e((string)$l['id']) ?>"
+                                        data-region="<?= e((string)$l['region_id']) ?>"
+                                        data-lat="<?= e((string)$l['lat']) ?>"
+                                        data-lon="<?= e((string)$l['lon']) ?>"
+                                        <?= (string)$l['id'] === $old['destination_location_id'] ? 'selected' : '' ?>>
+                                    <?= e($l['title']) ?> (<?= e($l['location_code']) ?>) — <?= e($l['region_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
 
-        <div class="col-md-6">
-          <label class="form-label" for="distance_km">مسافت (کیلومتر)</label>
-          <div class="input-group">
-            <span class="input-group-text"><span class="iconify" data-icon="solar:ruler-bold"></span></span>
-            <input type="number" step="0.01" min="0.01" class="form-control ltr-text" id="distance_km" name="distance_km" required
-                   value="<?= e($old['distance_km']) ?>">
-          </div>
-        </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="distance_km">مسافت (کیلومتر)</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><span class="iconify" data-icon="solar:ruler-bold"></span></span>
+                        <input type="number" step="0.01" min="0.01" class="form-control ltr-text" id="distance_km" name="distance_km" required
+                               value="<?= e($old['distance_km']) ?>">
+                    </div>
+                </div>
 
-        <div class="col-md-6">
-          <label class="form-label" for="product_type">نوع فرآورده</label>
-          <div class="input-group">
-            <span class="input-group-text"><span class="iconify" data-icon="solar:fuel-bold"></span></span>
-            <select class="form-select" id="product_type" name="product_type" required>
-              <option value="">— انتخاب کنید —</option>
-              <?php foreach (PRODUCT_TYPES as $p): ?>
-                <option value="<?= e($p) ?>" <?= $old['product_type'] === $p ? 'selected' : '' ?>><?= e($p) ?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-        </div>
-      </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="product_type">نوع فرآورده</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><span class="iconify" data-icon="solar:fuel-bold"></span></span>
+                        <select class="form-select" id="product_type" name="product_type" required>
+                            <option value="">— انتخاب کنید —</option>
+                            <?php foreach (PRODUCT_TYPES as $p): ?>
+                                <option value="<?= e($p) ?>" <?= $old['product_type'] === $p ? 'selected' : '' ?>><?= e($p) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+            </div>
 
-      <?php if ($myRegionId !== null): ?>
-        <input type="hidden" id="my_region_id" value="<?= e((string)$myRegionId) ?>">
-      <?php endif; ?>
+            <?php if ($myRegionId !== null): ?>
+                <input type="hidden" id="my_region_id" value="<?= e((string)$myRegionId) ?>">
+            <?php endif; ?>
 
-      <div class="d-flex gap-2 mt-4">
-        <button type="submit" class="btn btn-primary d-flex align-items-center gap-2">
-          <span class="iconify" data-icon="solar:diskette-bold"></span> ذخیره تغییرات
-        </button>
-        <a href="<?= BASE_URL ?>/waybills/list.php" class="btn btn-outline-secondary">انصراف</a>
-      </div>
-    </form>
-  </div>
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary d-flex align-items-center gap-2">
+                    <span class="iconify" data-icon="solar:diskette-bold"></span> ذخیره تغییرات
+                </button>
+                <a href="<?= BASE_URL ?>/waybills/list.php" class="btn btn-outline-secondary">انصراف</a>
+            </div>
+        </form>
+    </div>
 </div>
 
 <?php if (can_assign_operator()): ?>
-<div class="row g-3 mt-1">
-  <div class="col-md-6">
-    <div class="card panel-card h-100">
-      <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
-        <div>
-          <div class="fw-bold">تخصیص متصدی مبدا</div>
-          <div class="text-muted small">مسئول ارسال از مبدا</div>
+    <div class="row g-3 mt-1">
+        <div class="col-md-6">
+            <div class="card panel-card h-100">
+                <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <div>
+                        <div class="fw-bold">تخصیص متصدی مبدا</div>
+                        <div class="text-muted small">مسئول ارسال از مبدا</div>
+                    </div>
+                    <a href="<?= BASE_URL ?>/waybills/assign_operator.php?id=<?= e((string)$waybill['id']) ?>&side=origin" class="btn btn-soft-purple d-flex align-items-center gap-2">
+                        <span class="iconify" data-icon="solar:user-id-bold"></span> تخصیص
+                    </a>
+                </div>
+            </div>
         </div>
-        <a href="<?= BASE_URL ?>/waybills/assign_operator.php?id=<?= e((string)$waybill['id']) ?>&side=origin" class="btn btn-soft-purple d-flex align-items-center gap-2">
-          <span class="iconify" data-icon="solar:user-id-bold"></span> تخصیص
-        </a>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-6">
-    <div class="card panel-card h-100">
-      <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
-        <div>
-          <div class="fw-bold">تخصیص متصدی مقصد</div>
-          <div class="text-muted small">مسئول تحویل در مقصد</div>
+        <div class="col-md-6">
+            <div class="card panel-card h-100">
+                <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <div>
+                        <div class="fw-bold">تخصیص متصدی مقصد</div>
+                        <div class="text-muted small">مسئول تحویل در مقصد</div>
+                    </div>
+                    <a href="<?= BASE_URL ?>/waybills/assign_operator.php?id=<?= e((string)$waybill['id']) ?>&side=destination" class="btn btn-soft-purple d-flex align-items-center gap-2">
+                        <span class="iconify" data-icon="solar:user-id-bold"></span> تخصیص
+                    </a>
+                </div>
+            </div>
         </div>
-        <a href="<?= BASE_URL ?>/waybills/assign_operator.php?id=<?= e((string)$waybill['id']) ?>&side=destination" class="btn btn-soft-purple d-flex align-items-center gap-2">
-          <span class="iconify" data-icon="solar:user-id-bold"></span> تخصیص
-        </a>
-      </div>
     </div>
-  </div>
-</div>
 <?php endif; ?>
 
 <?php if (can_assign_driver()): ?>
-<div class="card panel-card mt-3">
-  <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
-    <div>
-      <div class="fw-bold">تخصیص راننده</div>
-      <div class="text-muted small">تعیین راننده مسئول حمل این بارنامه</div>
+    <div class="card panel-card mt-3">
+        <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div>
+                <div class="fw-bold">تخصیص راننده</div>
+                <div class="text-muted small">تعیین راننده مسئول حمل این بارنامه</div>
+            </div>
+            <a href="<?= BASE_URL ?>/waybills/assign_driver.php?id=<?= e((string)$waybill['id']) ?>" class="btn btn-soft-purple d-flex align-items-center gap-2">
+                <span class="iconify" data-icon="solar:bus-bold"></span> تخصیص راننده
+            </a>
+        </div>
     </div>
-    <a href="<?= BASE_URL ?>/waybills/assign_driver.php?id=<?= e((string)$waybill['id']) ?>" class="btn btn-soft-purple d-flex align-items-center gap-2">
-      <span class="iconify" data-icon="solar:bus-bold"></span> تخصیص راننده
-    </a>
-  </div>
-</div>
 <?php endif; ?>
 
 <?php if (can_attach_seal_to_waybill()): ?>
-<div class="card panel-card mt-3">
-  <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
-    <div>
-      <div class="fw-bold">تخصیص پلمپ</div>
-      <div class="text-muted small">الصاق یا تغییر پلمپ این بارنامه</div>
+    <div class="card panel-card mt-3">
+        <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div>
+                <div class="fw-bold">تخصیص پلمپ</div>
+                <div class="text-muted small">الصاق یا تغییر پلمپ این بارنامه</div>
+            </div>
+            <a href="<?= BASE_URL ?>/waybills/assign_seal.php?id=<?= e((string)$waybill['id']) ?>" class="btn btn-soft-purple d-flex align-items-center gap-2">
+                <span class="iconify" data-icon="solar:lock-password-unlocked-bold"></span> تخصیص پلمپ
+            </a>
+        </div>
     </div>
-    <a href="<?= BASE_URL ?>/waybills/assign_seal.php?id=<?= e((string)$waybill['id']) ?>" class="btn btn-soft-purple d-flex align-items-center gap-2">
-      <span class="iconify" data-icon="solar:lock-password-unlocked-bold"></span> تخصیص پلمپ
-    </a>
-  </div>
-</div>
 <?php endif; ?>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>
