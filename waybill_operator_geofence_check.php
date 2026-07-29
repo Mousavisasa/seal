@@ -24,7 +24,7 @@ $errors              = [];
 $operator            = null;
 $waybill             = null;
 $role                = '';
-$waybillId           = 0;
+$waybillNumber           = 0;
 $geofenceEnabled     = (int)get_setting(SETTING_GEOFENCE_CONTROL_OPERATOR, '1') === 1;
 
 $resolved = validate_operator_action_token($token);
@@ -33,7 +33,7 @@ if (!$resolved) {
 } else {
     $operator  = $resolved['operator'];
     $role      = $resolved['role']; // 'origin' یا 'destination'
-    $waybillId = $resolved['waybill_id'];
+    $waybillNumber = $resolved['waybill_number'];
 
     if ($operator['user_type'] !== 'operator') {
         $operator = null;
@@ -44,7 +44,7 @@ if (!$resolved) {
     }
 }
 
-if ($operator && $waybillId > 0) {
+if ($operator && $waybillNumber > 0) {
     try {
         ensure_operator_confirm_columns();
         $stmt = db()->prepare(
@@ -56,7 +56,7 @@ if ($operator && $waybillId > 0) {
              INNER JOIN locations dl ON dl.id = w.destination_location_id
              WHERE w.id = ? LIMIT 1'
         );
-        $stmt->execute([$waybillId]);
+        $stmt->execute([$waybillNumber]);
         $waybill = $stmt->fetch();
 
         $ownerColumn   = $role === 'origin' ? 'origin_operator_user_id' : 'destination_operator_user_id';
@@ -292,7 +292,7 @@ if ($operator) {
 
   btnConfirm.addEventListener('click', function () {
     if (!insideGeofence || btnConfirm.disabled) return;
-    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN)+'&myseal='+<?= e((string)$waybillId) ?>;
+    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN)+'&myseal='+<?= e((string)$waybillNumber) ?>;
   });
 
   var baseLayers = {
@@ -414,8 +414,7 @@ if ($operator) {
   var btnConfirmDirect = document.getElementById('btnConfirmDirect');
   
   btnConfirmDirect.addEventListener('click', function () {
-    //window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN)+'&myseal='+<?php //= e((string)$waybillId) ?>//;
-    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN)+'&myseal='+<?= e((string)$waybillId) ?>;
+    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN)+'&myseal='+<?= e((string)$waybillNumber) ?>;
   });
 })();
 </script>

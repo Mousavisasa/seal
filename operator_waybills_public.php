@@ -322,7 +322,7 @@ $statusClassMap = [
                                   <?php else: ?>
                                       <div class="flex-fill d-grid gap-2">
                                         <?php $opToken = create_operator_action_token((int)$operator['id'], $role, (int)$w['id']); ?>
-                                        <a href="<?= BASE_URL ?>/waybill_operator_geofence_check.php?token=<?= e(rawurlencode($opToken)) ?>&myseal=<?= ($w['id']) ?>"
+                                        <a href="<?= BASE_URL ?>/waybill_operator_geofence_check.php?token=<?= e(rawurlencode($opToken)) ?>&myseal=<?= ($w['waybill_number']) ?>"
                                            class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
                                             <span class="iconify" data-icon="solar:check-circle-bold"></span> تایید حضور
                                         </a>
