@@ -13,10 +13,10 @@ require_admin();
 $errors = [];
 
 $current = get_settings([
-        SETTING_DEFAULT_SERVICE_UUID        => '12345678-1234-1234-1234-123456789abc',
-        SETTING_DEFAULT_CHARACTERISTIC_UUID => 'abcdefab-cdef-abcd-efab-cdefabcdefab',
-        SETTING_GEOFENCE_CONTROL_ENABLED     => '1',
-        SETTING_GEOFENCE_CONTROL_OPERATOR    => '1',
+    SETTING_DEFAULT_SERVICE_UUID        => '',
+    SETTING_DEFAULT_CHARACTERISTIC_UUID => '',
+    SETTING_GEOFENCE_CONTROL_ENABLED     => '1',
+    SETTING_GEOFENCE_CONTROL_OPERATOR    => '1',
 ]);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -37,9 +37,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!$errors) {
             $ok = set_setting(SETTING_DEFAULT_SERVICE_UUID, $current[SETTING_DEFAULT_SERVICE_UUID])
-                    && set_setting(SETTING_DEFAULT_CHARACTERISTIC_UUID, $current[SETTING_DEFAULT_CHARACTERISTIC_UUID])
-                    && set_setting(SETTING_GEOFENCE_CONTROL_ENABLED, $current[SETTING_GEOFENCE_CONTROL_ENABLED])
-                    && set_setting(SETTING_GEOFENCE_CONTROL_OPERATOR, $current[SETTING_GEOFENCE_CONTROL_OPERATOR]);
+                && set_setting(SETTING_DEFAULT_CHARACTERISTIC_UUID, $current[SETTING_DEFAULT_CHARACTERISTIC_UUID])
+                && set_setting(SETTING_GEOFENCE_CONTROL_ENABLED, $current[SETTING_GEOFENCE_CONTROL_ENABLED])
+                && set_setting(SETTING_GEOFENCE_CONTROL_OPERATOR, $current[SETTING_GEOFENCE_CONTROL_OPERATOR]);
 
             if ($ok) {
                 set_flash('success', 'تنظیمات با موفقیت ذخیره شد.');
