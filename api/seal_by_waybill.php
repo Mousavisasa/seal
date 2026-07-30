@@ -99,7 +99,7 @@ try {
             "SELECT sl.id, sl.seal_id, sl.seal_password, sl.service_uuid, sl.characteristic_uuid
              FROM fuel_waybills w
              INNER JOIN seals sl ON sl.fuel_waybill_id = w.id
-             WHERE w.waybill_number = ?
+             WHERE w.id = ?
                AND (w.origin_operator_user_id = ? OR w.destination_operator_user_id = ?)
              LIMIT 1"
         );
