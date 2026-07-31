@@ -20,8 +20,8 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // اطلاعات اتصال به پایگاه داده (پیش‌فرض XAMPP)
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'idtoir_smart_seal');
-define('DB_USER', 'idtoir_smart_seal');
+define('DB_NAME', 'yadkonim2_seal');
+define('DB_USER', 'yadkonim2_seal');
 define('DB_PASS', 'MyPass@1234');
 define('DB_CHARSET', 'utf8mb4');
 
