@@ -32,7 +32,7 @@ $waybill             = null;
 $role                = ''; // 'origin' یا 'destination' — برای تعیین مکان هدف حصار
 $tokenKind           = ''; // 'presence' یا 'approve'
 $approveType         = ''; // فقط برای tokenKind === 'approve': 'loading' یا 'delivery'
-$waybillId           = 0;
+$waybill_number           = 0;
 $geofenceEnabled     = (int)get_setting(SETTING_GEOFENCE_CONTROL_OPERATOR, '1') === 1;
 
 $resolved = validate_operator_action_token($token);
@@ -40,7 +40,8 @@ if ($resolved) {
     $tokenKind = 'presence';
     $operator  = $resolved['operator'];
     $role      = $resolved['role']; // 'origin' یا 'destination'
-    $waybillId = $resolved['waybill_id'];
+    $waybill_number = $resolved['waybill_number'];
+
 } else {
     $resolved = validate_operator_approve_token($token);
     if ($resolved) {
@@ -48,7 +49,7 @@ if ($resolved) {
         $operator    = $resolved['operator'];
         $approveType = $resolved['approve_type']; // 'loading' یا 'delivery'
         $role        = $approveType === 'loading' ? 'origin' : 'destination';
-        $waybillId   = $resolved['waybill_id'];
+        $waybill_number   = $resolved['waybill_number'];
     }
 }
 
@@ -62,7 +63,7 @@ if (!$operator) {
     $errors[] = 'حساب کاربری شما غیرفعال شده است. برای اطلاعات بیشتر با مدیر سامانه تماس بگیرید.';
 }
 
-if ($operator && $waybillId > 0) {
+if ($operator && $waybill_number > 0) {
     try {
         ensure_operator_confirm_columns();
         $stmt = db()->prepare(
@@ -72,22 +73,22 @@ if ($operator && $waybillId > 0) {
              FROM fuel_waybills w
              INNER JOIN locations ol ON ol.id = w.origin_location_id
              INNER JOIN locations dl ON dl.id = w.destination_location_id
-             WHERE w.id = ? LIMIT 1'
+             WHERE w.waybill_number = ? LIMIT 1'
         );
-        $stmt->execute([$waybillId]);
+        $stmt->execute([$waybill_number]);
         $waybill = $stmt->fetch();
 
         $ownerColumn = $role === 'origin' ? 'origin_operator_user_id' : 'destination_operator_user_id';
 
         if (!$waybill) {
-            $errors[] = 'بارنامه مورد نظر یافت نشد.';
+            $errors[] = ' بارنامه مورد نظر یافت نشد.'.$waybill_number;
         } elseif ((int)$waybill[$ownerColumn] !== (int)$operator['id']) {
             $waybill = null;
-            $errors[] = 'این بارنامه به شما تخصیص داده نشده است.';
+            $errors[] = ' این بارنامه به شما تخصیص داده نشده است.'.$waybill_number;
         } elseif ($tokenKind === 'presence') {
             $confirmColumn = $role === 'origin' ? 'origin_confirmed_at' : 'destination_confirmed_at';
             if (!empty($waybill[$confirmColumn])) {
-                $errors[] = 'حضور شما برای این بارنامه قبلاً تایید شده است.';
+                $errors[] = ' حضور شما برای این بارنامه قبلاً تایید شده است.'.$waybill_number;
             }
         } else { // approve
             $expectedStatus = $approveType === 'loading' ? 'بارگیری شده' : 'پایان پیمایش';
@@ -97,10 +98,10 @@ if ($operator && $waybillId > 0) {
         }
     } catch (PDOException $e) {
         error_log('Waybill operator geofence check error: ' . $e->getMessage());
-        $errors[] = 'خطایی در دریافت اطلاعات بارنامه رخ داد.';
+        $errors[] = 'خطایی در دریافت اطلاعات بارنامه رخ داد.'.$waybill_number;
     }
 } elseif (!$errors) {
-    $errors[] = 'درخواست نامعتبر است.';
+    $errors[] = 'درخواست نامعتبر است.'.$waybill_number;
 }
 
 // مکان هدف: برای متصدی مبدا، مکان مبدا؛ برای متصدی مقصد، مکان مقصد
@@ -324,7 +325,7 @@ if ($operator) {
 
                 btnConfirm.addEventListener('click', function () {
                     if (!insideGeofence || btnConfirm.disabled) return;
-                    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN)+'&myseal='+<?= e((string)$waybillId) ?>;
+                    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN)+'&myseal='+<?= e((string)$waybill_number) ?>;
                 });
 
                 var baseLayers = {
@@ -446,7 +447,7 @@ if ($operator) {
                 var btnConfirmDirect = document.getElementById('btnConfirmDirect');
 
                 btnConfirmDirect.addEventListener('click', function () {
-                    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN)+'&myseal='+<?= e((string)$waybillId) ?>;
+                    window.location.href = LOADING_PAGE_URL + '?token=' + encodeURIComponent(TOKEN)+'&myseal='+<?= e((string)$waybill_number) ?>;
                 });
             })();
         </script>
