@@ -188,6 +188,22 @@ function create_operator_action_token(int $userId, string $role, int $waybillId)
 }
 
 /**
+ * دریافت shomارهٔ بارنامه (waybill_number) بر اساس شناسهٔ (id) آن در جدول fuel_waybills
+ * @return string|null شمارهٔ بارنامه، یا null اگر بارنامه‌ای با این id یافت نشود
+ */
+function get_waybill_number_by_id(int $waybillId): ?string
+{
+    if ($waybillId <= 0) {
+        return null;
+    }
+
+    $stmt = db()->prepare('SELECT waybill_number FROM fuel_waybills WHERE id = ? LIMIT 1');
+    $stmt->execute([$waybillId]);
+    $row = $stmt->fetch();
+
+    return $row ? (string)$row['waybill_number'] : null;
+}
+/**
  * اعتبارسنجی توکن «تایید حضور متصدی» و استخراج نقش + شناسه بارنامه از آن
  * @return array|null ['operator'=>..., 'role'=>'origin'|'destination', 'waybill_id'=>int] یا null
  */
@@ -224,6 +240,7 @@ function validate_operator_action_token(string $token): ?array
         'operator'   => $operator,
         'role'       => $parts[1],
         'waybill_id' => (int)$parts[2],
+        'waybill_number' => get_waybill_number_by_id($parts[2]),
     ];
 }
 
@@ -276,5 +293,6 @@ function validate_operator_approve_token(string $token): ?array
         'operator'     => $operator,
         'approve_type' => $parts[1],
         'waybill_id'   => (int)$parts[2],
+        'waybill_number' => get_waybill_number_by_id($parts[2]),
     ];
 }

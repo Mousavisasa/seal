@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf()) {
         set_flash('danger', 'نشست شما منقضی شده است. لطفاً دوباره تلاش کنید.');
     } elseif ($waybillId <= 0 || !in_array($action, ['start_trip', 'end_trip'], true)) {
-        set_flash('danger', 'درخواست نامعتبر است.');
+        set_flash('danger', 'درخواست نامعتبر است.'.' $waybillId = ');
     } else {
         try {
             $stmt = db()->prepare('SELECT * FROM fuel_waybills WHERE id = ? LIMIT 1');
