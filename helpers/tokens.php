@@ -226,3 +226,55 @@ function validate_operator_action_token(string $token): ?array
         'waybill_id' => (int)$parts[2],
     ];
 }
+
+/**
+ * ساخت توکن یک‌بارمصرف مخصوص «تایید بارگیری» (متصدی مبدا) یا «تایید تحویل»
+ * (متصدی مقصد) — برای این‌که این دو عملیات هم مثل تایید حضور، پیش از ثبت
+ * نهایی از صفحهٔ بررسی حصار جغرافیایی (waybill_operator_geofence_check.php)
+ * عبور کنند. نوع عملیات (loading/delivery) و شناسه بارنامه داخل خودِ توکن
+ * قفل می‌شود.
+ */
+function create_operator_approve_token(int $userId, string $approveType, int $waybillId): string
+{
+    return create_access_token($userId, 'opapprove:' . $approveType . ':' . $waybillId);
+}
+
+/**
+ * اعتبارسنجی توکن «تایید بارگیری/تحویل» و استخراج نوع عملیات + شناسه بارنامه از آن
+ * @return array|null ['operator'=>..., 'approve_type'=>'loading'|'delivery', 'waybill_id'=>int] یا null
+ */
+function validate_operator_approve_token(string $token): ?array
+{
+    if ($token === '' || !preg_match('/^[a-f0-9]{64}$/', $token)) {
+        return null;
+    }
+
+    ensure_access_tokens_table();
+
+    $stmt = db()->prepare(
+        "SELECT u.*, t.purpose FROM access_tokens t
+         INNER JOIN users u ON u.id = t.user_id
+         WHERE t.token = ? AND t.purpose LIKE 'opapprove:%' AND t.expires_at >= NOW()
+         LIMIT 1"
+    );
+    $stmt->execute([$token]);
+    $row = $stmt->fetch();
+
+    if (!$row) {
+        return null;
+    }
+
+    $parts = explode(':', $row['purpose'], 3);
+    if (count($parts) !== 3 || !in_array($parts[1], ['loading', 'delivery'], true) || !ctype_digit($parts[2])) {
+        return null;
+    }
+
+    $operator = $row;
+    unset($operator['password'], $operator['purpose']);
+
+    return [
+        'operator'     => $operator,
+        'approve_type' => $parts[1],
+        'waybill_id'   => (int)$parts[2],
+    ];
+}
